@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
 
@@ -20,7 +20,7 @@ class Memory:
     content: str                       # Raw text
     embedding: Optional[List[float]] = None
     importance: float = 0.5            # 0.0 – 1.0
-    created_at: datetime = field(default_factory=datetime.now(datetime.timezone.utc))
+    created_at: datetime = field(default_factory=datetime.now(timezone.utc))
     last_accessed: Optional[datetime] = None
     access_count: int = 0
     metadata: dict = field(default_factory=dict)
@@ -32,6 +32,6 @@ class ConversationTurn:
     session_id: str
     role: str                          # "user" | "assistant"
     content: str
-    timestamp: datetime = field(default_factory=datetime.now(datetime.timezone.utc))
+    timestamp: datetime = field(default_factory=datetime.now(timezone.utc))
     tool_calls: List[dict] = field(default_factory=list)
     emotional_snapshot: Optional[dict] = None

@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict
 from ..database.connection import get_db_connection
-from config.settings import settings
+from ..config.settings import settings
 
 class ShortTermMemory:
     def __init__(self, session_id: str, max_turns: int = settings.stm_max_turns) -> None:
@@ -14,7 +14,7 @@ class ShortTermMemory:
         with get_db_connection() as db:
             db.execute(
                 "INSERT INTO conversation_turns VALUES (?,?,?,?,?,?,?)",
-                (str(uuid.uuid4()), self.session_id, role, content, "[]", "{}", datetime.now(datetime.timezone.utc).isoformat())
+                (str(uuid.uuid4()), self.session_id, role, content, "[]", "{}", datetime.now(timezone.utc).isoformat())
             )
 
     # Retrieving the most recent conversation turns for the session, up to the specified limit (20 by default)

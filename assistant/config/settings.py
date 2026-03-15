@@ -18,7 +18,9 @@ class Settings(BaseSettings):
  
     owner_name:     Optional[str] = None
     owner_email:    Optional[str] = None
-    owner_timezone: str   = "UTC"
+    owner_timezone: str   = "America/New_York"
+
+    assistant_name: str   = "Aria"
  
     smtp_host:      str   = "smtp.gmail.com"
     smtp_port:      int   = 587

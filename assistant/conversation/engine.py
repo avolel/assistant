@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
 from ..llm.base import LLMProvider, LLMMessage
@@ -22,11 +22,11 @@ class ConversationEngine:
     def _init_session(self) -> None:
         with get_db_connection() as db:
             db.execute("INSERT INTO sessions VALUES (?,?,?,?,?)",
-                (self.session_id, self.owner_id,datetime.now(datetime.timezone.utc).isoformat(), None, None))
+                (self.session_id, self.owner_id,datetime.now(timezone.utc).isoformat(), None, None))
 
     # Main method to handle a user message and generate a response    
     async def chat(self, user_message: str, extra_context: str = "") -> str:
-        self.stm.add("user", user_message)
+        self.stm.add_turn("user", user_message)
 
         system = self.prompt_builder.build_system(self.identity, extra_context)
         history = self.stm.get_recent() # Get recent conversation history for context
@@ -37,5 +37,5 @@ class ConversationEngine:
         messages.append(LLMMessage(role="user", content=user_message))
 
         response = await self.llm.complete(messages)
-        self.stm.add("assistant", response.content)
+        self.stm.add_turn("assistant", response.content)
         return response.content

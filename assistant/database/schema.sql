@@ -56,6 +56,6 @@ CREATE TABLE IF NOT EXISTS emotional_states (
     recorded_at TEXT NOT NULL
 );
 
-CREATE INDEX idx_turns_session   ON conversation_turns(session_id);
-CREATE INDEX idx_memories_owner  ON memories(owner_id);
-CREATE INDEX idx_memories_type   ON memories(memory_type);
+CREATE INDEX IF NOT EXISTS idx_turns_session   ON conversation_turns(session_id);
+CREATE INDEX IF NOT EXISTS idx_memories_owner  ON memories(owner_id);
+CREATE INDEX IF NOT EXISTS idx_memories_type   ON memories(memory_type);

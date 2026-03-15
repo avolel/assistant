@@ -1,7 +1,7 @@
 import httpx, json
 from typing import AsyncIterator, List
 from .base import LLMProvider, LLMMessage, LLMResponse
-from config.settings import settings
+from ..config.settings import settings
 
 # OllamaProvider implementation for Ollama LLM API
 class OllamaProvider(LLMProvider):
