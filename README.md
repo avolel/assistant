@@ -187,7 +187,7 @@ class MyTool(BaseTool):
 
 | Tool | Description |
 |------|-------------|
-| `web_search` | DuckDuckGo and SaerXng search (no API key needed) |
+| `web_search` | DuckDuckGo and SearXng search (no API key needed) |
 | `email_sender` | Send emails via SMTP |
 | `notes` | Save and retrieve local markdown notes |
 
