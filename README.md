@@ -15,7 +15,7 @@ A fully local, always-on AI assistant that runs on your computer. Built with Pyt
 - **Time Awareness** — Knows the date, time, day of week, and can simulate availability/work hours
 - **Tool System** — Plugin-style tools: web search, email sending, and note taking
 - **Voice Interface** — Speak to your assistant and hear responses back (fully local STT/TTS)
-- **Local LLM** — Runs with Ollama or HuggingFace models; swap models without code changes
+- **Local LLM** — Runs with Ollama
 
 ---
 
@@ -85,7 +85,7 @@ Assistant name: Aria
 Your name: Alice
 Your email (optional): alice@example.com
 Your timezone: America/New_York
-LLM provider [ollama/huggingface]: ollama
+LLM provider [ollama]: ollama
 LLM model [llama3]: llama3
 
 ✓ Identity created.
@@ -120,7 +120,7 @@ assistant/
 │   ├── memory/                    # STM + LTM, embeddings, summarizer
 │   ├── emotions/                  # Emotional state + update engine
 │   ├── time_awareness/            # Time context + availability
-│   ├── llm/                       # LLM abstraction + providers
+│   ├── llm/                       # LLM abstraction + provider
 │   ├── tools/                     # Plugin registry + built-in tools
 │   ├── voice/                     # STT + TTS services
 │   ├── database/                  # SQLite connection + migrations
@@ -205,7 +205,6 @@ ASSISTANT_LLM_MODEL=llama3
 | Provider | Models |
 |----------|--------|
 | `ollama` | llama3, mistral, phi3, gemma, etc. |
-| `huggingface` | Any HF model ID |
 
 The LLM abstraction layer means adding a new provider only requires implementing one class.
 
