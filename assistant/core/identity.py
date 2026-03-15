@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional
 from ..database.connection import get_db_connection
+from config.settings import settings
 
 # OwnerProfile represents the identity and profile of the owner of the assistant. 
 @dataclass
@@ -10,7 +11,7 @@ class OwnerProfile:
     owner_id: str #UUID
     name: str
     email: Optional[str] = None
-    timezone: str = "UTC"
+    timezone: str = settings.owner_timezone
     created_at: datetime = field(default_factory=datetime.now(datetime.timezone.utc))
     facts: List[str] = field(default_factory=list)  #Learned facts
     preferences: dict = field(default_factory=dict)
