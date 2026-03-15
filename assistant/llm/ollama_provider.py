@@ -5,8 +5,8 @@ from config.settings import settings
 
 # OllamaProvider implementation for Ollama LLM API
 class OllamaProvider(LLMProvider):
-    def __init__(self, base_url: str = "http://localhost:11434") -> None:
-        self.model = settings.llm_model
+    def __init__(self, model: str = settings.llm_model, base_url: str = settings.llm_base_url) -> None:
+        self.model = model
         self.base_url = base_url
 
     # Implement the complete method to get a full response from the Ollama API
