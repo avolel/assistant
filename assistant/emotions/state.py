@@ -13,8 +13,12 @@ class EmotionalState:
     engagement: float  = 0.7   # 0.0 (disengaged)    – 1.0 (fully engaged)
     updated_at: datetime = None
 
-    # This method updates the emotional state based on an interaction with the user.
+    # Ensure all values stay in [0, 1].
     def clamp(self) -> None:
-        """Ensure all values stay in [0, 1]."""
         for attr in ("mood", "trust", "stress", "engagement"):
-            setattr(self, attr, max(0.0, min(1.0, getattr(self, attr))))
+            setattr(self, attr, max(0.0, min(1.0, getattr(self, attr)))) # Clamp values to [0, 1]
+
+    # Returns a dictionary representation of the emotional state.
+    def to_dict(self) -> dict:
+        return {"mood": self.mood, "trust": self.trust,
+                "stress": self.stress, "engagement": self.engagement}
