@@ -187,7 +187,7 @@ class MyTool(BaseTool):
 
 | Tool | Description |
 |------|-------------|
-| `web_search` | DuckDuckGo search (no API key needed) |
+| `web_search` | DuckDuckGo and SaerXng search (no API key needed) |
 | `email_sender` | Send emails via SMTP |
 | `notes` | Save and retrieve local markdown notes |
 
@@ -264,50 +264,12 @@ pytest tests/integration/
 
 # Memory retrieval accuracy
 pytest tests/accuracy/
+
 ```
-
-Target coverage: **≥ 80%** for all Phase 1–3 modules.
-
----
-
-## 🗺️ Development Roadmap
-
-| Phase | Focus | Status |
-|-------|-------|--------|
-| **1** | Core assistant — CLI chat, identity, basic memory | 🔲 Planned |
-| **2** | Long-term semantic memory + session summarization | 🔲 Planned |
-| **3** | Tool system — web search, email, notes | 🔲 Planned |
-| **4** | Voice interface — STT + TTS | 🔲 Planned |
-| **5** | Emotional simulation | 🔲 Planned |
-| **6** | Behavioral simulation + personality evolution | 🔲 Planned |
-
----
-
 ## 🔒 Security Notes
 
-- Passwords and API keys are loaded from `.env` only — never hardcoded
-- All user data is stored in `~/.assistant/` (not in the repo)
+- Passwords and API keys are loaded from `.env` only — **never hardcoded**
+- All user data is stored in `~/.assistant/` - **not in the repo**
 - Set `chmod 700 ~/.assistant` to restrict access to your OS user
-- `.env` is gitignored by default — **never commit it**
-
----
-
-## 📦 Dependencies
-
-Key libraries used:
-
-```toml
-httpx             # Async HTTP (Ollama API calls)
-pydantic          # Data models + settings
-chromadb          # Local vector database
-duckduckgo-search # Web search (no API key)
-faster-whisper    # Local speech-to-text
-pyttsx3           # Text-to-speech
-sounddevice       # Microphone input
-rich              # Terminal UI
-typer             # CLI framework
-```
-
-Full list in `pyproject.toml`.
-
+- `.env` is gitignored by default — **never committed**
 ---
