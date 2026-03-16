@@ -377,7 +377,9 @@ Target coverage: **≥ 80%** for all core modules.
 |-------|-------|--------|
 | **1** | Core assistant — CLI chat, identity, basic memory | ✅ Done |
 | **2** | Long-term semantic memory + session summarization | ✅ Done |
-| **3** | Tool system — | web search - ✅ Done | email - 🔄 In Progress | notes - ✅ Done |
+| **3a** | Tool system — | web search - ✅ Done |
+| **3b** | Tool system — | email - 🔄 In Progress |
+| **3c** | Tool system — | notes - ✅ Done |
 | **4** | Voice interface — STT + TTS | 🔲 Planned |
 | **5** | Emotional simulation |  ✅ Done |
 | **6** | Behavioral simulation + personality evolution |  🔲 Planned |
