@@ -380,7 +380,7 @@ Target coverage: **≥ 80%** for all core modules.
 | **3** | Tool system — | web search - ✅ Done | email - 🔄 In Progress | notes - ✅ Done |
 | **4** | Voice interface — STT + TTS | 🔲 Planned |
 | **5** | Emotional simulation |  ✅ Done |
-| **6** | Behavioral simulation + personality evolution |  ✅ Done |
+| **6** | Behavioral simulation + personality evolution |  🔲 Planned |
 
 ---
 
