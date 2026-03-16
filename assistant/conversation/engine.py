@@ -128,12 +128,7 @@ class ConversationEngine:
             try:
                 tool = self.tools.get(tool_name)
                 result = await tool.run(**params)
-
-                # TEMPORARY DEBUG
-                print(f"DEBUG TOOL SUCCESS: {result.success}")
-                print(f"DEBUG TOOL OUTPUT: '{result.output[:500]}'")
-                print(f"DEBUG TOOL ERROR: '{result.error}'")
-                
+              
                 if result.success:
                     results.append(f"Tool '{tool_name}' result:\n{result.output}")
                 else:

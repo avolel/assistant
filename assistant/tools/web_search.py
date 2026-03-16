@@ -1,35 +1,54 @@
-from duckduckgo_search import AsyncDDGS
+import httpx
 from .base import BaseTool, ToolResult
 from .registry import register_tool
+
+SEARXNG_URL = "http://localhost:8080/search"
 
 @register_tool
 class WebSearchTool(BaseTool):
     name = "web_search"
     description = "Search the internet for current information."
-    # Using duckduckgo_search for privacy-focused search results without API keys
     parameters = {
-        "query": {"type": "string", "description": "Search query"},
-        "max_results": {"type": "integer", "description": "Number of results (default 5)", "optional": True}
+        "query":       {"type": "string",  "description": "The search query"},
+        "max_results": {"type": "integer", "description": "Number of results to return", "optional": True}
     }
 
     async def run(self, query: str, max_results: int = 5) -> ToolResult:
-        if not query:
-            return ToolResult(success=False, output="", error="Query is required")
-
         try:
-            async with AsyncDDGS() as ddgs:
-                results = [r async for r in ddgs.text(query, max_results=max_results)] 
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                r = await client.get(
+                    SEARXNG_URL,
+                    params={
+                        "q":                 query,
+                        "format":            "json",
+                        "number_of_results": max_results,
+                        "language":          "en",
+                        "safesearch":        "0",
+                    }
+                )
+                r.raise_for_status()
+                data = r.json()
 
-            # DEBUG
-            print(f"DEBUG DDG RAW RESULTS COUNT: {len(results)}")
-            if results:
-                print(f"DEBUG FIRST RESULT: {results[0]}")
+            results = data.get("results", [])
 
             if not results:
-                return ToolResult(success=False, output="", error="DuckDuckGo returned no results for that query.")
+                return ToolResult(
+                    success=False,
+                    output="",
+                    error="SearXNG returned no results for that query."
+                )
 
-            output = "\n".join(f"- {r['title']}: {r['body']}" for r in results)
-            return ToolResult(success=True, output=output) 
+            output = "\n".join(
+                f"- {r.get('title', 'No title')}: {r.get('content', r.get('url', ''))}"
+                for r in results[:max_results]
+            )
+            return ToolResult(success=True, output=output)
+
+        except httpx.ConnectError:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Could not connect to SearXNG. Is Docker running? Check http://localhost:8080"
+            )
         except Exception as e:
-            print(f"DEBUG DDG EXCEPTION: {type(e).__name__}: {e}")
             return ToolResult(success=False, output="", error=str(e))
