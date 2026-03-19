@@ -17,7 +17,7 @@ async def get_or_create_engine(session_id: Optional[str]) -> ConversationEngine:
         raise ValueError("Assistant not configured. Run setup first.")
     llm = create_llm_provider(settings.llm_provider, model=settings.llm_model)
     owner_id = identity.owners[0].owner_id
-    timezone = identity.owners[0].timezone
-    engine = ConversationEngine(llm, identity, owner_id, timezone)
+    timezone = identity.owners[0].owner_timezone
+    engine = ConversationEngine(llm, identity, owner_id)
     _sessions[engine.session_id] = engine
     return engine

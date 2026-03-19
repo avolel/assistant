@@ -16,4 +16,5 @@ async def send_message(req: ChatRequest):
             emotional_state=engine.emotion_state.to_dict()
         )
     except Exception as e:
+        print(f"Error in chat endpoint: {e}")
         raise HTTPException(500, str(e))
