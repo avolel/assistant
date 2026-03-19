@@ -17,7 +17,6 @@ A fully local, always-on AI assistant that runs on your computer. Built with Pyt
 - **Time Awareness** — Knows the date, time, day of week, and can simulate availability/work hours
 - **Tool System** — Plugin-style tools with native LLM tool calling support
 - **Web Search** — Fully local search via SearXNG, no API keys, no rate limits, nothing leaves your machine
-- **Email** — Send emails via any SMTP server, including local dev servers like Mailpit
 - **Notes** — Save and retrieve markdown notes stored locally on disk
 - **Voice Interface** — Speak to your assistant and hear responses back (fully local STT/TTS)
 - **Local LLM** — Runs with Ollama; supports any model including native tool-calling models
@@ -43,8 +42,8 @@ A fully local, always-on AI assistant that runs on your computer. Built with Pyt
 ┌──────┐  ┌──────┐  ┌───────┐
 │ LLM  │  │Memory│  │ Tools │
 │Layer │  │ STM  │  │Search │
-│Ollama│  │ LTM  │  │ Email │
-│      │  │Chroma│  │ Notes │
+│Ollama│  │ LTM  │  |Notes  |
+│      │  │Chroma│  │       │
 └──────┘  └──────┘  └───────┘
              │
     ┌────────▼────────┐
@@ -61,7 +60,7 @@ A fully local, always-on AI assistant that runs on your computer. Built with Pyt
 
 - Python 3.11+
 - [Ollama](https://ollama.com) installed and running locally
-- Docker (for SearXNG web search and Mailpit email)
+- Docker (for SearXNG web search)
 - A pulled Ollama model — a native tool-calling model is recommended
 
 ```bash
@@ -99,13 +98,6 @@ docker run -d \
 docker exec searxng sed -i 's/formats:/formats:\n    - json/' /etc/searxng/settings.yml
 docker restart searxng
 
-# Mailpit — local email testing (required for email tool)
-docker run -d \
-  --name mailpit \
-  -p 8025:8025 \
-  -p 1025:1025 \
-  --restart unless-stopped \
-  axllent/mailpit
 ```
 
 ### First-Time Setup
@@ -233,7 +225,6 @@ Parameters marked `optional: True` are excluded from the `required` list sent to
 | Tool | Backend | Description |
 |------|---------|-------------|
 | `web_search` | SearXNG (local Docker) | Search the web with no API key and no rate limits |
-| `email` | SMTP / Mailpit (local Docker) | Send emails via any SMTP server | **In development**
 | `notes` | Local filesystem | Save and retrieve markdown notes in `~/assistant_notes/` |
 
 ---
@@ -253,21 +244,6 @@ The SearXNG web UI is available at `http://localhost:8080` while the container i
 You: Search the web for upcoming DJ Puffy shows
 Aria: Here's what I found...
 ```
-
----
-
-## 📧 Email **Still In Development**
-
-Email is handled via SMTP. For local development, **Mailpit** runs as a local catch-all SMTP server — it accepts all outgoing emails and displays them in a web inbox at `http://localhost:8025`. Nothing is actually delivered anywhere, making it safe for testing.
-
-For production use, point the SMTP settings at any real mail server by updating `.env`. The tool code does not need to change.
-
-```
-You: Send an email to john@example.com with subject Hello and body Just testing
-Aria: Email sent to john@example.com with subject 'Hello'.
-```
-
----
 
 ## 🤖 LLM Configuration
 
@@ -320,13 +296,6 @@ ASSISTANT_STT_MODEL_SIZE=base
 
 # Owner
 ASSISTANT_OWNER_TIMEZONE=America/New_York
-
-# Email — Mailpit defaults for local development
-ASSISTANT_SMTP_HOST=localhost
-ASSISTANT_SMTP_PORT=1025
-ASSISTANT_SMTP_USER=
-ASSISTANT_SMTP_PASS=
-ASSISTANT_SMTP_FROM=Aria <aria@localhost>
 ```
 
 ---
@@ -336,17 +305,16 @@ ASSISTANT_SMTP_FROM=Aria <aria@localhost>
 | Service | Purpose | Port |
 |---------|---------|------|
 | SearXNG | Local web search | UI: http://localhost:8080 |
-| Mailpit | Local email testing | UI: http://localhost:8025  SMTP: localhost:1025 |
 
 ```bash
-# Check both are running
-docker ps | grep -E "searxng|mailpit"
+# Check if running
+docker ps | grep -E "searxng"
 
-# Stop services
-docker stop searxng mailpit
+# Stop service
+docker stop searxng
 
-# Start services again
-docker start searxng mailpit
+# Start service again
+docker start searxng
 ```
 
 ---
@@ -378,7 +346,6 @@ Target coverage: **≥ 80%** for all core modules.
 | **1** | Core assistant — CLI chat, identity, basic memory | ✅ Done |
 | **2** | Long-term semantic memory + session summarization | ✅ Done |
 | **3a** | Tool system — web search | ✅ Done |
-| **3b** | Tool system — email | 🔄 In Progress |
 | **3c** | Tool system — notes | ✅ Done |
 | **4** | Voice interface — STT + TTS | 🔲 Planned |
 | **5** | Emotional simulation |  ✅ Done |
@@ -393,7 +360,7 @@ Target coverage: **≥ 80%** for all core modules.
 - Notes are stored in `~/assistant_notes/` on your local filesystem
 - Run `chmod 700 ~/.assistant` to restrict access to your OS user
 - `.env` is gitignored by default — never commit it
-- All services (Ollama, SearXNG, Mailpit) run locally — no data leaves your machine
+- All services (Ollama, SearXNG) run locally — no data leaves your machine
 
 ---
 
