@@ -1,5 +1,6 @@
 # Entry Point for the application
 import asyncio, typer
+import uvicorn
 from rich.console import Console
 from rich.prompt import Prompt
 from assistant.core.assistant import AssistantCore
@@ -48,6 +49,13 @@ def chat():
             console.print(f"[bold cyan]{name}:[/bold cyan] {response}\n")
  
     asyncio.run(loop()) # Run the async chat loop
+
+# Start the FastAPI backend server.
+@app.command()
+def serve():    
+    console.print("[bold blue]  Starting API server on http://localhost:8000[/bold blue]")
+    uvicorn.run("assistant.api.app:app", host="127.0.0.1",
+                port=8000, reload=True)
 
 if __name__ == "__main__":
     app()
