@@ -130,7 +130,7 @@ Run `python main.py chat` to start.
 ```bash
 # Text interface
 python main.py chat
-
+```
 ---
 
 ## 📁 Project Structure
