@@ -25,7 +25,7 @@ A fully local, always-on AI assistant that runs on your computer. Built with Pyt
 
 ## 🏗️ Architecture Overview
 
----
+```
 ┌─────────────────────────────────────────────────────────────┐
 │                      USER INTERFACES                        │
 │         [CLI / Terminal]   [Voice / STT]   [Web / API]      │
@@ -56,8 +56,7 @@ A fully local, always-on AI assistant that runs on your computer. Built with Pyt
      │                  PERSISTENCE LAYER                   │
      │    [SQLite: Logs / Meta]    [ChromaDB: Embeddings]   │
      └──────────────────────────────────────────────────────┘
-
----
+```
 
 ## 🚀 Quick Start
 
