@@ -1,4 +1,5 @@
 from faster_whisper import WhisperModel
+import numpy as np
 
 try:
     import sounddevice as sd
@@ -17,7 +18,7 @@ class SpeechToTextService:
             raise RuntimeError(
                 "PortAudio not found. Install it with: sudo apt install portaudio19-dev"
             )
-        import numpy as np
+        
         audio = sd.rec(int(duration * sample_rate),
                        samplerate=sample_rate, channels=1, dtype="float32")
         sd.wait()

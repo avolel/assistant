@@ -8,14 +8,15 @@ try:
     stt = SpeechToTextService()
     tts = TextToSpeechService()
     VOICE_AVAILABLE = True
-except Exception:
+except Exception as e:
+    print(f"Voice unavailable: {type(e).__name__}: {e}") 
     VOICE_AVAILABLE = False
 
 # Endpoint to listen to the microphone, 
 # transcribe the audio, and return the transcribed text as a JSON response
 @router.post("/listen")
 async def voice_listen(duration: int = 5):
-    if not VOICE_AVAILABLE:
+    if not VOICE_AVAILABLE:        
         raise HTTPException(503, "Voice unavailable. Install PortAudio: sudo apt install portaudio19-dev")    
     audio = stt.record(duration=duration)
     text = stt.transcribe(audio)

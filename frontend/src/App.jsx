@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { MessageBubble } from "./components/MessageBubble";
 import { ChatInput } from "./components/ChatInput";
+import axios from 'axios';
 import { sendMessage, getIdentity } from "./api/assistant"; // API functions to interact with the backend
  
 export default function App() {
