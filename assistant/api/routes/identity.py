@@ -5,6 +5,7 @@ from ...core.identity import IdentityManager
 router = APIRouter()
 identity_manager = IdentityManager()
 
+# Endpoint to retrieve the assistant's identity information.
 @router.get("/", response_model=IdentityResponse)
 async def get_identity():
     if not identity_manager.is_configured():
@@ -16,6 +17,9 @@ async def get_identity():
         configured=True
     )
 
+# Endpoint to set up the assistant's identity with the provided details. 
+# It checks if the identity is already configured and raises an error if so. 
+# Otherwise, it sets up
 @router.post("/setup", response_model=IdentityResponse)
 async def setup_identity(req: SetupRequest):
     if identity_manager.is_configured():

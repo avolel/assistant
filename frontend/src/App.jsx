@@ -10,11 +10,13 @@ export default function App() {
   const [identity, setIdentity] = useState(null);
   const bottomRef = useRef(null);
  
+  // Fetch assistant identity on mount
   useEffect(() => {
     getIdentity().then(setIdentity);
   }, []);
  
   useEffect(() => {
+    // Scroll to bottom whenever messages change
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
  
@@ -39,6 +41,21 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  const handleVoice = async () => {
+  setLoading(true);
+  try {
+    const { data } = await axios.post("http://localhost:8000/api/voice/listen",
+                                       null, { params: { duration: 5 } });
+    if (data.transcription) {
+      await handleSend(data.transcription);
+      // Optionally speak the reply:
+      await axios.post("/api/voice/speak", null, { params: { text: reply } })
+    }
+  } finally {
+    setLoading(false);
+  }
+};
  
   return (
     <div className="flex flex-col h-screen max-w-3xl mx-auto">
@@ -79,7 +96,7 @@ export default function App() {
         <div ref={bottomRef} />
       </main>
  
-      <ChatInput onSend={handleSend} loading={loading} />
+      <ChatInput voiceEnabled={true} onVoice={handleVoice} onSend={handleSend} loading={loading} />
     </div>
   );
 }

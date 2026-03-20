@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import chat, identity, health
+from .routes import chat, identity, health, voice
 
 app = FastAPI(title="Personal AI Assistant API", version="1.0.0")
 app.add_middleware(
@@ -14,4 +14,5 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api")
 app.include_router(identity.router, prefix="/api/identity")
 app.include_router(chat.router,     prefix="/api/chat")
+app.include_router(voice.router,    prefix="/api/voice")
 #app.include_router(memory.router,   prefix="/api/memory")

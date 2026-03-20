@@ -4,6 +4,8 @@ from ..session_store import get_or_create_engine
 
 router = APIRouter() # This router will be included in the main app with prefix "/api/chat"
 
+# Endpoint to handle chat messages. It expects a ChatRequest with a session_id and message,
+# and returns a ChatResponse with the reply, session_id, and emotional state.
 @router.post("/", response_model=ChatResponse)
 async def send_message(req: ChatRequest):
     try:
