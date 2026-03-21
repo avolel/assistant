@@ -2,20 +2,17 @@ from .state import EmotionalState
 from datetime import datetime, timezone
 
 class EmotionEngine:
-    POS  = {"thank","great","love","perfect","brilliant","amazing","helpful"}
-    NEG  = {"wrong","bad","useless","broken","terrible","awful","disappoint"}
-    RUDE = {"idiot","stupid","dumb","shut up","worthless","hate you"}
 
-    def update(self, state: EmotionalState,user_message: str) -> EmotionalState:
-        msg = user_message.lower()
-        if any(kw in msg for kw in self.POS):
+    def update(self, state: EmotionalState, sentiment: str) -> EmotionalState:
+        msg_sentiment = sentiment.lower()
+        if msg_sentiment == "positive":
             state.mood       += 0.05 
             state.trust      += 0.03
             state.engagement += 0.04
-        if any(kw in msg for kw in self.NEG):
+        if msg_sentiment == "negative":
             state.mood   -= 0.04
             state.stress += 0.05
-        if any(kw in msg for kw in self.RUDE):
+        if msg_sentiment == "rude":
             state.trust      -= 0.10
             state.engagement -= 0.08
             state.stress     += 0.08

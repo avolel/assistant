@@ -5,9 +5,49 @@ from ..config.settings import settings
 
 # OllamaProvider implementation for Ollama LLM API
 class OllamaProvider(LLMProvider):
-    def __init__(self, model: str = settings.llm_model, base_url: str = settings.llm_base_url) -> None:
+    def __init__(self, model: str = settings.llm_model, base_url: str = settings.llm_base_url, emotion_model: str = settings.llm_model_emotion) -> None:
         self.model = model
         self.base_url = base_url
+        self.emotion_model = emotion_model
+
+    # Implement the emotion_analysis method to get the emotional state of the user message
+    async def emotion_analysis(self, user_message: str) -> str:
+        payload = {
+            "model": self.emotion_model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an emotion classifier. "
+                        "Analyze the emotional tone of the user's message and respond with a single word only. "
+                        "Your response must be exactly one of: POSITIVE, NEGATIVE or RUDE. "
+                        "No explanation, no punctuation, no other text. Just the single word."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": user_message
+                }
+            ],
+            "stream": False,
+            "options": {"temperature": 0.7, "num_predict": 2048}
+        }
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/chat", json=payload)
+                response.raise_for_status()
+                data = response.json()
+                message = data.get("message", {})
+                content = message.get("content", "")
+                return content.strip()
+            except httpx.HTTPError as e:
+                print(f"DEBUG HTTP ERROR (Emotion Analysis): {e.response.status_code} — {e.response.text}")
+                raise
+            except Exception as e:
+                print(f"{payload}")
+                print(f"DEBUG UNEXPECTED ERROR (Emotion Analysis): {type(e).__name__}: {e}")
+                raise
 
     # Implement the complete method to get a full response from the Ollama API
     async def complete(self, 

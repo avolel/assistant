@@ -26,6 +26,6 @@ class AssistantCore:
     def start(self) -> None:
         self.identity = self.identity_mgr.load()
         llm = create_llm_provider(settings.llm_provider, model=settings.llm_model,
-                                   base_url=settings.llm_base_url)
+                                   base_url=settings.llm_base_url, emotion_model=settings.llm_model_emotion)
         owner_id = self.identity.owners[0].owner_id
         self.engine = ConversationEngine(llm, self.identity, owner_id)

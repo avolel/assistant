@@ -15,6 +15,7 @@ from ..emotions.state import EmotionalState
 from ..emotions.engine import EmotionEngine
 from ..time_awareness.service import TimeAwarenessService
 from ..tools.registry import ToolRegistry
+from .history import ConversationHistory
 import assistant.tools.web_search   
 import assistant.tools.notes         
 
@@ -33,6 +34,7 @@ class ConversationEngine:
         self.emotion_engine = EmotionEngine()
         self.time_svc       = TimeAwarenessService(settings.owner_timezone)
         self.tools          = ToolRegistry()
+        self.history = ConversationHistory(self.session_id, max_turns=20)
         self._init_session()
 
     # Initialize a new conversation session in the databaseS
@@ -46,6 +48,8 @@ class ConversationEngine:
         self.memory.add_turn("user", user_message)
         recalled = await self.memory.recall(user_message, n=4)
         memory_ctx = ""
+
+        message_sentiment = await self.llm.emotion_analysis(user_message)
 
         # If relevant memories are recalled, 
         # format them into a context string to include in the system prompt.
@@ -81,9 +85,10 @@ class ConversationEngine:
             response.content = await self._execute_tool(response.content)
 
         self.memory.add_turn("assistant", response.content)
+        self.history.trim_if_needed()
 
         # Update emotional state based on the conversation and response.
-        self.emotion_state = self.emotion_engine.update(self.emotion_state, user_message)
+        self.emotion_state = self.emotion_engine.update(self.emotion_state, message_sentiment)
 
         # Extract and store any relevant facts from the user's message for long-term memory storage.
         await self.memory.extract_and_store_facts(user_message)

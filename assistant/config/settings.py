@@ -6,6 +6,7 @@ from typing import Optional
 class Settings(BaseSettings):
     llm_provider: str = "ollama"
     llm_model: str = "gpt-oss:20b"
+    llm_model_emotion: str = "llama3.1:8b"
     llm_base_url:   str   = "http://localhost:11434"
     llm_temperature:float = 0.7
 
