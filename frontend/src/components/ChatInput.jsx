@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Send, Mic, Square } from "lucide-react";
 
-export function ChatInput({ onSend, onVoice, onStopVoice, loading, voiceEnabled, recording, recordingSeconds, recordingDuration = 5 }) {
+export function ChatInput({ onSend, onVoice, onStopVoice, loading, voiceEnabled, recording, recordingSeconds, recordingDuration = 10 }) {
   // useState returns [currentValue, setterFunction].
   // setText("...") triggers a re-render with the new value.
   const [text, setText] = useState("");
