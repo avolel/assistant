@@ -3,7 +3,10 @@
 // so callers receive the parsed JSON directly without unwrapping `.data` themselves.
 import axios from "axios";
 
-const BASE = "http://localhost:8000/api";
+// Use a relative path so the same build works whether the browser accesses the
+// server via localhost, 127.0.0.1, 0.0.0.0, or any other hostname.
+// In dev, Vite proxies /api → http://localhost:8000 (see vite.config.js).
+const BASE = "/api";
 
 // POST /api/chat/ — send a user message and receive the assistant's reply.
 // sessionId=null starts a new session; passing an existing ID continues it.
