@@ -1,11 +1,42 @@
 // MessageBubble renders one chat message — either a user message (right-aligned, blue)
 // or an assistant message (left-aligned, dark) with optional emotional state bars.
+import { useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
+import { Volume2, VolumeX } from "lucide-react";
+
+// Strip markdown syntax so the speech synthesiser reads clean prose, not "asterisk asterisk bold".
+function stripMarkdown(text) {
+  return text
+    .replace(/```[\s\S]*?```/g, "")   // fenced code blocks
+    .replace(/`[^`]*`/g, "")          // inline code
+    .replace(/#{1,6}\s/g, "")         // headings
+    .replace(/\*\*([^*]+)\*\*/g, "$1") // bold
+    .replace(/\*([^*]+)\*/g, "$1")    // italic
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // links → label only
+    .replace(/^[-*+]\s/gm, "")        // unordered list bullets
+    .replace(/^\d+\.\s/gm, "")        // ordered list numbers
+    .trim();
+}
 
 // Props are destructured directly in the function signature — equivalent to:
 // function MessageBubble(props) { const { role, content, emotionalState } = props; ... }
 export function MessageBubble({ role, content, emotionalState }) {
   const isUser = role === "user";
+  const [speaking, setSpeaking] = useState(false);
+
+  const handleSpeak = useCallback(() => {
+    if (!window.speechSynthesis) return;
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(stripMarkdown(content));
+    utterance.onend   = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    setSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  }, [content, speaking]);
 
   return (
     // Conditional className: user messages are pushed right with justify-end.
@@ -29,6 +60,19 @@ export function MessageBubble({ role, content, emotionalState }) {
       >
         {/* ReactMarkdown renders markdown syntax (bold, code blocks, lists) in the content string. */}
         <ReactMarkdown>{content}</ReactMarkdown>
+
+        {/* TTS speak button — only on assistant messages, uses the browser Web Speech API. */}
+        {!isUser && (
+          <button
+            onClick={handleSpeak}
+            title={speaking ? "Stop speaking" : "Read aloud"}
+            className={`mt-2 flex items-center gap-1 text-xs transition-colors
+              ${speaking ? "text-blue-400 hover:text-slate-400" : "text-slate-500 hover:text-slate-300"}`}
+          >
+            {speaking ? <VolumeX size={13} /> : <Volume2 size={13} />}
+            {speaking ? "Stop" : "Speak"}
+          </button>
+        )}
 
         {/* Show emotion bars only on assistant messages that include emotional state data. */}
         {!isUser && emotionalState && (

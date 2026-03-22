@@ -39,3 +39,15 @@ class SpeechToTextService:
         segments, _ = self.model.transcribe(audio, beam_size=5, language="en")
         # segments is a generator of Segment objects. Join their text with spaces.
         return " ".join(s.text.strip() for s in segments)
+
+    def transcribe_file(self, audio_bytes: bytes, suffix: str = ".webm") -> str:
+        """Write audio bytes to a temp file and transcribe it. Supports any format ffmpeg can decode."""
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(audio_bytes)
+            tmp_path = tmp.name
+        try:
+            segments, _ = self.model.transcribe(tmp_path, beam_size=5, language="en")
+            return " ".join(s.text.strip() for s in segments)
+        finally:
+            os.unlink(tmp_path)

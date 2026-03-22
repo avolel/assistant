@@ -213,6 +213,14 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportMenuId, setExportMenuId] = useState(null);     // Session with export format menu open
 
+  // Voice recording state
+  const [recording,        setRecording]        = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const RECORDING_DURATION = 5;   // max seconds before auto-stop
+  const mediaRecorderRef = useRef(null);   // MediaRecorder instance
+  const chunksRef        = useRef([]);     // accumulated audio chunks
+  const timerRef         = useRef(null);   // setInterval handle for countdown
+
   // useRef gives a mutable ref object whose .current property persists across renders.
   // Used here to get a DOM reference for auto-scrolling — not tracked by React state.
   const bottomRef = useRef(null);
@@ -297,18 +305,63 @@ export default function App() {
     }
   };
 
-  const handleVoice = async () => {
+  // Finalise recording: send the collected audio chunks to the backend for transcription.
+  const stopAndTranscribe = async (chunks, mimeType) => {
+    const blob = new Blob(chunks, { type: mimeType });
+    const ext  = mimeType.includes("ogg") ? ".ogg" : mimeType.includes("mp4") ? ".mp4" : ".webm";
+    const form = new FormData();
+    form.append("audio", blob, `recording${ext}`);
     setLoading(true);
     try {
-      // Ask the server to record 5 seconds of audio and return the transcription.
-      const { data } = await axios.post("http://localhost:8000/api/voice/listen",
-                                         null, { params: { duration: 5 } });
-      if (data.transcription) {
-        await handleSend(data.transcription);   // Route the transcription through the normal send flow
-      }
+      const { data } = await axios.post("http://localhost:8000/api/voice/transcribe", form);
+      if (data.transcription) await handleSend(data.transcription);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleStopVoice = () => {
+    if (!mediaRecorderRef.current) return;
+    clearInterval(timerRef.current);
+    mediaRecorderRef.current.stop();   // triggers the onstop handler which calls stopAndTranscribe
+    setRecording(false);
+    setRecordingSeconds(0);
+  };
+
+  const handleVoice = async () => {
+    // Request microphone access. The browser prompts the user if permission hasn't been granted yet.
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      alert("Microphone access denied. Please allow microphone access and try again.");
+      return;
+    }
+
+    chunksRef.current = [];
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm"
+                   : MediaRecorder.isTypeSupported("audio/ogg")  ? "audio/ogg"
+                   : "audio/mp4";
+    const recorder = new MediaRecorder(stream, { mimeType });
+
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    recorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());   // release mic
+      stopAndTranscribe(chunksRef.current, mimeType);
+    };
+
+    mediaRecorderRef.current = recorder;
+    recorder.start();
+    setRecording(true);
+    setRecordingSeconds(0);
+
+    // Tick the counter every second; auto-stop at RECORDING_DURATION.
+    let elapsed = 0;
+    timerRef.current = setInterval(() => {
+      elapsed += 1;
+      setRecordingSeconds(elapsed);
+      if (elapsed >= RECORDING_DURATION) handleStopVoice();
+    }, 1000);
   };
 
   const handleLoadSession = async (id) => {
@@ -514,7 +567,16 @@ export default function App() {
           <div ref={bottomRef} />
         </main>
 
-        <ChatInput voiceEnabled={true} onVoice={handleVoice} onSend={handleSend} loading={loading} />
+        <ChatInput
+          voiceEnabled={true}
+          onVoice={handleVoice}
+          onStopVoice={handleStopVoice}
+          onSend={handleSend}
+          loading={loading}
+          recording={recording}
+          recordingSeconds={recordingSeconds}
+          recordingDuration={RECORDING_DURATION}
+        />
       </div>
 
       {/* ── Settings Modal ─────────────────────────────────────── */}

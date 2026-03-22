@@ -18,3 +18,17 @@ class TextToSpeechService:
         say() adds to an internal queue; runAndWait() processes it and returns when done."""
         self._engine.say(text)
         self._engine.runAndWait()
+
+    def speak_to_bytes(self, text: str) -> bytes:
+        """Synthesise text and return raw WAV bytes.
+        save_to_file() writes audio to a temp file; runAndWait() triggers the render."""
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            self._engine.save_to_file(text, tmp_path)
+            self._engine.runAndWait()
+            with open(tmp_path, "rb") as f:
+                return f.read()
+        finally:
+            os.unlink(tmp_path)
