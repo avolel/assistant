@@ -106,7 +106,7 @@ def main():
             tmp_html = os.path.join(tmp_dir, f"slide_{i}.html")
             Path(tmp_html).write_text(slide_html)
 
-            out_png = str(OUT_DIR / f"slide_{i:02d}.png")
+            out_png = os.path.join(tmp_dir, f"slide_{i:02d}.png")
             print(f"  Capturing slide {i}...", end=" ", flush=True)
             screenshot(tmp_html, out_png)
             print("done")
@@ -129,8 +129,7 @@ def main():
         ], check=True, capture_output=True)
         print("done")
 
-        print(f"\nDone! Files in: {OUT_DIR}")
-        print(f"  • {total} PNGs (slide_01.png … slide_{total:02d}.png)")
+        print(f"\nDone! PDF saved to: {OUT_DIR}")
         print(f"  • aria_deck.pdf  ← upload this to LinkedIn as a document post")
 
     finally:
