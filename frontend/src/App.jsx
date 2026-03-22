@@ -91,13 +91,13 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
     // Clicking the backdrop (not the modal card) triggers onClose.
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-      onClick={onClose}
-    >
+      onClick={onClose}>
+
       {/* Modal card: e.stopPropagation() stops clicks inside from bubbling to the backdrop. */}
       <div
         className="bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-6"
-        onClick={e => e.stopPropagation()}
-      >
+        onClick={e => e.stopPropagation()}>
+
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Assistant Settings</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
@@ -128,6 +128,7 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
           </div>
           {nameError && <p className="text-red-400 text-xs mt-1">{nameError}</p>}
         </div>
+        {/* ── Assistant Name End ────────────────────────────────── */}
 
         {/* ── Owners ───────────────────────────────────────────── */}
         <div>
@@ -166,6 +167,7 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
               </li>
             ))}
           </ul>
+
           {/* Add owner form — onSubmit calls handleAddOwner which calls e.preventDefault(). */}
           <form onSubmit={handleAddOwner} className="space-y-2">
             <input
@@ -195,8 +197,13 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
             {ownerError && <p className="text-red-400 text-xs">{ownerError}</p>}
           </form>
         </div>
+        {/* ── Owners End ───────────────────────────────────────── */}
+
       </div>
+      {/* End of modal card */}
+
     </div>
+    
   );
 }
 
