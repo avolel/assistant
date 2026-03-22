@@ -4,8 +4,6 @@ A fully local, always-on AI assistant that runs entirely on your machine. Built 
 
 > No cloud. No subscriptions. Your data never leaves your machine.
 
-> This project is in active development. Core functionality is working but some features are still being built out.
-
 ---
 
 ## Features
