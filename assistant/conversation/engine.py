@@ -1,3 +1,6 @@
+# ConversationEngine is the heart of the system.
+# It orchestrates a single chat turn: memory recall → emotion analysis → prompt building
+# → LLM call → optional tool execution → memory storage → emotion persistence.
 from datetime import datetime, timezone
 from typing import List, Optional
 from unittest import result
@@ -17,28 +20,32 @@ from ..time_awareness.service import TimeAwarenessService
 from ..tools.registry import ToolRegistry
 from .history import ConversationHistory
 from ..emotions.store import EmotionalStateStore
-import assistant.tools.web_search   
-import assistant.tools.notes         
+
+# Importing these modules triggers their @register_tool decorators, which populate the ToolRegistry.
+# There are no explicit symbols used — the side effect of importing IS the registration.
+import assistant.tools.web_search
+import assistant.tools.notes
+
 
 class ConversationEngine:
-    def __init__(self, 
-        llm: LLMProvider, 
-        identity: AssistantIdentity,
-        owner_id: str) -> None:
+    def __init__(self,
+                 llm: LLMProvider,
+                 identity: AssistantIdentity,
+                 owner_id: str) -> None:
         self.llm = llm
         self.identity = identity
         self.owner_id = owner_id
-        self.session_id = str(uuid.uuid4())
+        self.session_id = str(uuid.uuid4())   # New UUID per engine instance = new session per user/tab
         self.memory = MemoryManager(owner_id, self.session_id)
-        self.prompt_builder = PromptBuilder()        
-        self.emotion_store   = EmotionalStateStore()
+        self.prompt_builder = PromptBuilder()
+        self.emotion_store  = EmotionalStateStore()
         self.emotion_engine = EmotionEngine()
         self.time_svc       = TimeAwarenessService(settings.owner_timezone)
         self.tools          = ToolRegistry()
-        self.history = ConversationHistory(self.session_id, max_turns=20)
+        self.history        = ConversationHistory(self.session_id, max_turns=20)
 
-        # On initialization, we attempt to load the most recent emotional state for the owner 
-        # across all sessions.
+        # Restore the owner's emotional state from their most recent previous session.
+        # This makes mood/trust/stress persist across restarts rather than resetting every time.
         loaded = self.emotion_store.load_latest(owner_id)
         self.emotion_state = loaded if loaded else EmotionalState()
 
@@ -49,86 +56,103 @@ class ConversationEngine:
 
         self._init_session()
 
-    # Initialize a new conversation session in the databaseS
     def _init_session(self) -> None:
+        """Create a new session row in the DB. Called once at engine startup."""
         with get_db_connection() as db:
             db.execute("INSERT INTO sessions VALUES (?,?,?,?,?)",
-                (self.session_id, self.owner_id,datetime.now(timezone.utc).isoformat(), None, None))
+                (self.session_id, self.owner_id,
+                 datetime.now(timezone.utc).isoformat(), None, None))
 
-    # Main method to handle a user message and generate a response    
+    # `async def` marks this as a coroutine — callers must `await` it.
+    # FastAPI and Python's asyncio event loop handle scheduling without blocking the server.
     async def chat(self, user_message: str, extra_context: str = "") -> str:
+        """Process one user message end-to-end and return the assistant's reply string."""
+
+        # 1. Save the user turn immediately so it's in memory for context building.
         self.memory.add_turn("user", user_message)
+
+        # 2. Semantic recall: embed the message and find similar past memories in ChromaDB.
         recalled = await self.memory.recall(user_message, n=4)
         memory_ctx = ""
 
+        # 3. Classify the emotional tone of the message (POSITIVE / NEGATIVE / RUDE).
+        #    Done in parallel with memory recall conceptually, but sequentially here.
         message_sentiment = await self.llm.emotion_analysis(user_message)
 
-        # If relevant memories are recalled, 
-        # format them into a context string to include in the system prompt.
+        # 4. Format recalled memories as a markdown block to include in the system prompt.
         if recalled:
             snippets = "\n".join(f"- {m['content']}" for m in recalled)
             memory_ctx = f"## Relevant Memories\n{snippets}\n"
 
+        # 5. Assemble context: memories + current time + current emotional state.
         time_ctx    = self.time_svc.to_prompt_text()
         emotion_ctx = self.emotion_engine.to_prompt_text(self.emotion_state)
         full_ctx = f"{memory_ctx}\n\n{time_ctx}\n\n{emotion_ctx}\n\n{extra_context}"
 
-        # Build the system prompt with the assistant's identity and the relevant memory context, 
-        # along with any extra context provided.
+        # 6. Build the system prompt (identity + persona + context).
         system = self.prompt_builder.build_system(self.identity, full_ctx)
-        self._last_system = system # Store the last system prompt for potential reuse during tool execution.
-        
-        history = self.memory.get_recent_turns() 
+        # Store system prompt on self so _execute_tool and _execute_native_tool can reuse it
+        # without rebuilding it — they need the same context when sending tool results back.
+        self._last_system = system
+
+        # 7. Assemble the message list: [system] + [all recent turns except the last] + [current user msg].
+        #    history[:-1] skips the last turn because we already added the user message above,
+        #    and it appears explicitly as the final message.
+        history  = self.memory.get_recent_turns()
         messages = [LLMMessage(role="system", content=system)]
-        messages += [LLMMessage(role=t["role"], content=t["content"])
-                     for t in history[:-1]]   # Exclude last (just added)
+        messages += [LLMMessage(role=t["role"], content=t["content"]) for t in history[:-1]]
         messages.append(LLMMessage(role="user", content=user_message))
- 
+
+        # 8. Call the LLM with all registered tools passed as JSON definitions.
+        #    The model decides whether to respond directly or call a tool.
         response = await self.llm.complete(messages, tools=self.tools.to_ollama_tools())
 
-        # Handle native tool_calls (structured JSON from model)
+        # 9a. Native tool calling: modern models return structured tool_calls in the response object.
         if response.tool_calls:
             response.content = await self._execute_native_tool(response.tool_calls)
-     
-        #Check for TOOL_CALL in the response and execute if present, 
-        # replacing the response content with the tool output.
-        # Keep the old TOOL_CALL: text fallback for other models that don't support structured tool_calls yet.
+
+        # 9b. Text-based fallback: older models that don't support native tool_calls
+        #     may embed "TOOL_CALL: tool_name | param: value" directly in the response text.
         if "TOOL_CALL:" in response.content:
             response.content = await self._execute_tool(response.content)
 
+        # 10. Persist the assistant's reply and trim history to stay within the turn limit.
         self.memory.add_turn("assistant", response.content)
         self.history.trim_if_needed()
 
-        # Update emotional state based on the conversation and response.
+        # 11. Update emotional state based on the classified sentiment and save it to DB.
         self.emotion_state = self.emotion_engine.update(self.emotion_state, message_sentiment)
-
-        # Persist the updated emotional state after each interaction, 
-        # so it can be restored in future sessions.
         self.emotion_store.save(self.owner_id, self.session_id, self.emotion_state)
 
-        # Extract and store any relevant facts from the user's message for long-term memory storage.
+        # 12. Heuristic: if the message contains personal info patterns, store it in long-term memory.
         await self.memory.extract_and_store_facts(user_message)
+
         return response.content
-    
-    # Parse TOOL_CALL: syntax, execute, inject result, get final reply.
+
     async def _execute_tool(self, llm_output: str) -> str:
+        """Parse TOOL_CALL: text syntax, run the tool, inject the result back into the LLM, and return the final reply.
+        This is a fallback for models that don't support native structured tool_calls."""
+        # re.search scans for the pattern anywhere in the string.
+        # Group 1 = tool name, Group 2 = pipe-separated param string.
         match = re.search(r'TOOL_CALL: (\w+)\s*\|?(.*)', llm_output)
         if not match:
             return llm_output
-        tool_name = match.group(1).strip()
+        tool_name  = match.group(1).strip()
         params_str = match.group(2).strip()
         params = {}
         for part in params_str.split("|"):
             if ":" in part:
-                k, v = part.split(":", 1)
+                k, v = part.split(":", 1)   # maxsplit=1 so values with colons aren't broken
                 params[k.strip()] = v.strip()
         try:
-            tool = self.tools.get(tool_name)
-            result = await tool.run(**params)
+            tool   = self.tools.get(tool_name)
+            result = await tool.run(**params)   # ** unpacks the dict as keyword arguments
             inject = f"Tool result:\n{result.output}" if result.success else f"Tool error: {result.error}"
-            history = self.memory.get_recent_turns()
-            messages = [LLMMessage(role="system", content=self._last_system)]  # ← now defined
-            messages += [LLMMessage(role=t["role"], content=t["content"]) for t in history[:-1]]  # ← fixed
+            # Rebuild the message list with the tool result injected, then call the LLM again
+            # to get a natural language response that incorporates the tool output.
+            history  = self.memory.get_recent_turns()
+            messages = [LLMMessage(role="system", content=self._last_system)]
+            messages += [LLMMessage(role=t["role"], content=t["content"]) for t in history[:-1]]
             messages.append(LLMMessage(role="user", content=inject))
             final = await self.llm.complete(messages)
             return final.content
@@ -137,19 +161,20 @@ class ConversationEngine:
             logging.getLogger(__name__).error(f"Tool execution failed: {e}", exc_info=True)
             return f"I tried to use the {tool_name} tool but ran into an error: {e}"
 
-    # Execute native tool calls defined in the LLM response's tool_calls field,
-    # gather results, and send them back to the LLM for a final response generation.    
     async def _execute_native_tool(self, tool_calls: list) -> str:
+        """Execute structured tool_calls returned by the LLM, collect all results,
+        then send them back to the LLM for a final natural language response."""
         results = []
         for tc in tool_calls:
-            func = tc.get("function", {})
+            # Ollama returns tool calls in OpenAI-compatible format:
+            # { "function": { "name": "tool_name", "arguments": { ...params } } }
+            func      = tc.get("function", {})
             tool_name = func.get("name", "")
-            params = func.get("arguments", {})
+            params    = func.get("arguments", {})
 
             try:
-                tool = self.tools.get(tool_name)
+                tool   = self.tools.get(tool_name)
                 result = await tool.run(**params)
-              
                 if result.success:
                     results.append(f"Tool '{tool_name}' result:\n{result.output}")
                 else:
@@ -162,12 +187,14 @@ class ConversationEngine:
         if not results:
             return "I tried to use a tool but got no results."
 
-        # Send tool results back to the LLM for a final natural language response
-        inject = "\n\n".join(results)
-        history = self.memory.get_recent_turns()
+        # Join all tool results into a single string and send back to the LLM.
+        # The LLM then synthesises a natural-language answer using those results.
+        inject   = "\n\n".join(results)
+        history  = self.memory.get_recent_turns()
         messages = [LLMMessage(role="system", content=self._last_system)]
         messages += [LLMMessage(role=t["role"], content=t["content"]) for t in history[:-1]]
         messages.append(LLMMessage(role="user", content=inject))
 
+        # Pass tools again so the LLM can chain tool calls if needed.
         final = await self.llm.complete(messages, tools=self.tools.to_ollama_tools())
         return final.content

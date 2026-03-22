@@ -1,21 +1,25 @@
+# Session management: list, load, resume, and delete conversation sessions from SQLite.
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 from dataclasses import dataclass
 from ..database.connection import get_db_connection
 
+
 @dataclass
 class SessionSummary:
+    """Lightweight representation of a session — no turn content, just metadata."""
     session_id: str
     owner_id: str
     started_at: str
-    ended_at: Optional[str]
+    ended_at: Optional[str]   # None means the session is still in progress
     turn_count: int
-    summary: Optional[str]
+    summary: Optional[str]    # LLM-generated summary (set after session ends)
 
     @property
     def duration(self) -> str:
-        """Human readable duration of the session."""
+        """@property makes this callable as `session.duration` (no parentheses) like a computed attribute.
+        Returns a human-readable string like '2m 34s' or 'In progress'."""
         if not self.ended_at:
             return "In progress"
         start = datetime.fromisoformat(self.started_at)
@@ -24,18 +28,16 @@ class SessionSummary:
         if secs < 60:
             return f"{secs}s"
         if secs < 3600:
-            return f"{secs // 60}m {secs % 60}s"
+            return f"{secs // 60}m {secs % 60}s"   # // is integer (floor) division
         return f"{secs // 3600}h {(secs % 3600) // 60}m"
 
 
 class SessionManager:
+    """All DB operations for sessions. Stateless — instantiate fresh per request."""
 
-    # ── List ──────────────────────────────────────────────────────────────
-
-    def list_sessions(self,
-                      owner_id: str,
-                      limit: int = 20) -> List[SessionSummary]:
-        """Return the most recent sessions for an owner."""
+    def list_sessions(self, owner_id: str, limit: int = 20) -> List[SessionSummary]:
+        """Return the most recent sessions for an owner, newest first.
+        Uses a LEFT JOIN + COUNT to include turn counts without a second query."""
         with get_db_connection() as db:
             rows = db.execute(
                 """SELECT
@@ -55,6 +57,7 @@ class SessionManager:
                 (owner_id, limit)
             ).fetchall()
 
+        # List comprehension: concise way to transform a list. Equivalent to a for loop that appends.
         return [
             SessionSummary(
                 session_id=r["session_id"],
@@ -67,10 +70,8 @@ class SessionManager:
             for r in rows
         ]
 
-    # ── Resume ────────────────────────────────────────────────────────────
-
     def get_session(self, session_id: str) -> Optional[SessionSummary]:
-        """Fetch a single session by ID."""
+        """Fetch a single session by ID. Returns None if not found."""
         with get_db_connection() as db:
             row = db.execute(
                 """SELECT
@@ -101,8 +102,9 @@ class SessionManager:
         )
 
     def get_turns(self, session_id: str) -> List[dict]:
-        """Fetch all turns for a session ordered oldest to newest,
-        attaching the saved emotional state to each assistant turn."""
+        """Fetch all turns for a session, oldest to newest.
+        Attaches the saved emotional state snapshot to each assistant turn by index,
+        since emotional states are recorded once per assistant reply."""
         with get_db_connection() as db:
             turn_rows = db.execute(
                 """SELECT role, content, timestamp
@@ -129,36 +131,30 @@ class SessionManager:
         emotion_idx = 0
         for r in turn_rows:
             turn = {"role": r["role"], "content": r["content"], "timestamp": r["timestamp"]}
+            # Pair each assistant turn with the next available emotional state in chronological order.
             if r["role"] == "assistant" and emotion_idx < len(emotions):
                 turn["emotional_state"] = emotions[emotion_idx]
                 emotion_idx += 1
             result.append(turn)
         return result
 
-    def resume(self, session_id: str,
-               owner_id: str) -> Optional[str]:
-        """
-        Prepare a session for resumption.
-        Reopens a closed session by clearing ended_at.
-        Returns the session_id if found, None if not.
-        """
+    def resume(self, session_id: str, owner_id: str) -> Optional[str]:
+        """Reopen a closed session by clearing its ended_at timestamp.
+        Returns the session_id on success, None if not found or wrong owner."""
         session = self.get_session(session_id)
         if not session:
             return None
         if session.owner_id != owner_id:
             return None
-
-        # Reopen the session
         with get_db_connection() as db:
             db.execute(
                 "UPDATE sessions SET ended_at = NULL WHERE session_id = ?",
                 (session_id,)
             )
-
         return session_id
 
     def get_latest_session_id(self, owner_id: str) -> Optional[str]:
-        """Return the most recent session ID for an owner."""
+        """Return the most recent session ID for an owner, or None if none exist."""
         with get_db_connection() as db:
             row = db.execute(
                 """SELECT session_id FROM sessions
@@ -169,39 +165,22 @@ class SessionManager:
             ).fetchone()
         return row["session_id"] if row else None
 
-    # ── Delete ────────────────────────────────────────────────────────────
-
-    def delete_session(self, session_id: str,
-                       owner_id: str) -> bool:
-        """
-        Delete a session and all its turns.
-        Returns True if deleted, False if not found or wrong owner.
-        """
+    def delete_session(self, session_id: str, owner_id: str) -> bool:
+        """Delete a session and all its turns and emotional states.
+        Verifies ownership before deleting. Returns True if deleted, False if not found."""
         session = self.get_session(session_id)
         if not session or session.owner_id != owner_id:
             return False
 
         with get_db_connection() as db:
-            db.execute(
-                "DELETE FROM conversation_turns WHERE session_id = ?",
-                (session_id,)
-            )
-            db.execute(
-                "DELETE FROM emotional_states WHERE session_id = ?",
-                (session_id,)
-            )
-            db.execute(
-                "DELETE FROM sessions WHERE session_id = ?",
-                (session_id,)
-            )
+            db.execute("DELETE FROM conversation_turns WHERE session_id = ?", (session_id,))
+            db.execute("DELETE FROM emotional_states WHERE session_id = ?", (session_id,))
+            db.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
 
         return True
 
     def delete_all_sessions(self, owner_id: str) -> int:
-        """
-        Delete all sessions for an owner.
-        Returns the number of sessions deleted.
-        """
+        """Delete all sessions for an owner. Returns the count of deleted sessions."""
         sessions = self.list_sessions(owner_id, limit=9999)
         count = 0
         for s in sessions:

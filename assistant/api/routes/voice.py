@@ -1,31 +1,42 @@
+# Voice routes: record + transcribe audio (listen) and synthesise speech (speak).
+# Voice dependencies (faster-whisper, sounddevice, pyttsx3) require native system libraries
+# that may not be installed. The try/except at import time gracefully degrades —
+# the endpoints still exist but return 503 if the dependencies are missing.
 from fastapi import APIRouter, HTTPException
 from ..session_store import get_or_create_engine
 
-router = APIRouter() # Create a FastAPI router for voice-related endpoints
+router = APIRouter()
+
+# Attempt to import voice services. If PortAudio or faster-whisper isn't installed,
+# the import raises an OSError. We catch it and flag the services as unavailable
+# rather than crashing the whole server at startup.
 try:
     from ...voice.stt import SpeechToTextService
     from ...voice.tts import TextToSpeechService
-    stt = SpeechToTextService()
-    tts = TextToSpeechService()
+    stt             = SpeechToTextService()
+    tts             = TextToSpeechService()
     VOICE_AVAILABLE = True
 except Exception as e:
-    print(f"Voice unavailable: {type(e).__name__}: {e}") 
+    print(f"Voice unavailable: {type(e).__name__}: {e}")
     VOICE_AVAILABLE = False
 
-# Endpoint to listen to the microphone, 
-# transcribe the audio, and return the transcribed text as a JSON response
+
 @router.post("/listen")
 async def voice_listen(duration: int = 5):
-    if not VOICE_AVAILABLE:        
-        raise HTTPException(503, "Voice unavailable. Install PortAudio: sudo apt install portaudio19-dev")    
+    """Record `duration` seconds of audio from the microphone, transcribe it, and return the text.
+    `duration` is a query parameter: POST /api/voice/listen?duration=10"""
+    if not VOICE_AVAILABLE:
+        raise HTTPException(503, "Voice unavailable. Install PortAudio: sudo apt install portaudio19-dev")
     audio = stt.record(duration=duration)
-    text = stt.transcribe(audio)
+    text  = stt.transcribe(audio)
     return {"transcription": text}
- 
-# Endpoint to speak the given text using TTS (runs on the server machine) and return a confirmation response 
+
+
 @router.post("/speak")
 async def voice_speak(text: str):
+    """Synthesise speech for `text` and play it on the server machine.
+    Note: audio plays on the server, not in the browser — suitable for local use only."""
     if not VOICE_AVAILABLE:
-        raise HTTPException(503, "Voice unavailable. Install PortAudio: sudo apt install portaudio19-dev") 
+        raise HTTPException(503, "Voice unavailable. Install PortAudio: sudo apt install portaudio19-dev")
     tts.speak(text)
     return {"spoken": text}

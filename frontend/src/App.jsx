@@ -1,25 +1,34 @@
+// Root component — owns all top-level state and orchestrates the layout:
+// optional sidebar (chat history) + main chat area + optional settings modal.
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MessageBubble } from "./components/MessageBubble";
 import { ChatInput } from "./components/ChatInput";
 import axios from 'axios';
 import { sendMessage, getIdentity, getSessions, deleteSession, getSession, updateAssistantName, addOwner, removeOwner } from "./api/assistant";
 
+// Utility: format an ISO datetime string as a short locale string for display in the sidebar.
 function formatTime(iso) {
   if (!iso) return "";
   const d = new Date(iso);
   return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+// SettingsModal is a separate component to keep App clean.
+// It receives identity data and callbacks as props — App owns the state,
+// the modal just renders it and calls up when something changes.
 function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClearChat }) {
-  const [nameInput, setNameInput] = useState(identity?.assistant_name ?? "");
-  const [nameSaving, setNameSaving] = useState(false);
-  const [nameError, setNameError] = useState("");
+  // Each piece of form state lives in its own useState call.
+  // Initialise nameInput from the current identity name so the field is pre-filled.
+  const [nameInput,   setNameInput]   = useState(identity?.assistant_name ?? "");
+  const [nameSaving,  setNameSaving]  = useState(false);
+  const [nameError,   setNameError]   = useState("");
 
-  const [ownerName, setOwnerName] = useState("");
-  const [ownerEmail, setOwnerEmail] = useState("");
+  const [ownerName,   setOwnerName]   = useState("");
+  const [ownerEmail,  setOwnerEmail]  = useState("");
   const [ownerSaving, setOwnerSaving] = useState(false);
-  const [ownerError, setOwnerError] = useState("");
-  const [removingId, setRemovingId] = useState(null);
+  const [ownerError,  setOwnerError]  = useState("");
+  // Track which owner is currently being removed to show a loading indicator on that row.
+  const [removingId,  setRemovingId]  = useState(null);
 
   const handleSaveName = async () => {
     if (!nameInput.trim()) return;
@@ -27,10 +36,14 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
     setNameError("");
     try {
       const updated = await updateAssistantName(nameInput.trim());
+      // Pass the updated identity back up to App so the header reflects the new name.
       onIdentityChange(updated);
     } catch (e) {
+      // e?.response?.data?.detail is the FastAPI error detail string. `?.` is optional chaining —
+      // if any part of the chain is undefined, it short-circuits to undefined instead of throwing.
       setNameError(e?.response?.data?.detail ?? "Failed to update name");
     } finally {
+      // `finally` always runs — clears the loading state whether the call succeeded or failed.
       setNameSaving(false);
     }
   };
@@ -41,6 +54,8 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
     try {
       const updated = await removeOwner(ownerId);
       onIdentityChange(updated);
+      // If the removed owner's session is currently loaded, try to verify it still exists.
+      // If the session is now gone, clear the chat to avoid a stale state.
       if (sessionId) {
         try { await getSession(sessionId); }
         catch { onClearChat(); }
@@ -53,11 +68,13 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
   };
 
   const handleAddOwner = async (e) => {
+    // e.preventDefault() stops the default HTML form submission (page reload).
     e.preventDefault();
     if (!ownerName.trim()) return;
     setOwnerSaving(true);
     setOwnerError("");
     try {
+      // `|| undefined` converts an empty string to undefined so the field is omitted from the request.
       const updated = await addOwner({ name: ownerName.trim(), email: ownerEmail.trim() || undefined });
       onIdentityChange(updated);
       setOwnerName("");
@@ -70,10 +87,13 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
   };
 
   return (
+    // Backdrop: fixed overlay covering the whole screen.
+    // Clicking the backdrop (not the modal card) triggers onClose.
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={onClose}
     >
+      {/* Modal card: e.stopPropagation() stops clicks inside from bubbling to the backdrop. */}
       <div
         className="bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-6"
         onClick={e => e.stopPropagation()}
@@ -83,7 +103,7 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
           <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
         </div>
 
-        {/* Assistant Name */}
+        {/* ── Assistant Name ───────────────────────────────────── */}
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">Assistant Name</label>
           <div className="flex gap-2">
@@ -96,6 +116,7 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
                          focus:outline-none focus:border-blue-500"
               placeholder="e.g. Aria"
             />
+            {/* Disable Save if already saving, input is empty, or the name hasn't changed. */}
             <button
               onClick={handleSaveName}
               disabled={nameSaving || !nameInput.trim() || nameInput.trim() === identity?.assistant_name}
@@ -108,17 +129,22 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
           {nameError && <p className="text-red-400 text-xs mt-1">{nameError}</p>}
         </div>
 
-        {/* Owners */}
+        {/* ── Owners ───────────────────────────────────────────── */}
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">Owners</label>
           <ul className="space-y-1 mb-3">
+            {/* (identity?.owners ?? []) safely handles null identity during loading. */}
             {(identity?.owners ?? []).map(o => (
+              // `key` prop is required for list items — React uses it to track which items changed.
               <li key={o.owner_id} className="group flex items-center gap-2 text-sm text-slate-300 bg-slate-700 rounded-lg px-3 py-2">
+                {/* Avatar: first letter of the owner's name, uppercased. */}
                 <span className="w-7 h-7 rounded-full bg-blue-700 flex items-center justify-center text-white font-bold text-xs shrink-0">
                   {o.name[0]?.toUpperCase()}
                 </span>
                 <span className="min-w-0 flex-1 truncate">{o.name}</span>
+                {/* Email only shown on hover (group-hover:block). Hidden by default. */}
                 {o.email && <span className="text-slate-500 text-xs truncate hidden group-hover:block">· {o.email}</span>}
+                {/* Disable remove button when only one owner remains (backend enforces this too). */}
                 <button
                   onClick={() => handleRemoveOwner(o.owner_id)}
                   disabled={removingId === o.owner_id || (identity?.owners?.length ?? 0) <= 1}
@@ -126,6 +152,7 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
                              hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
                   title={(identity?.owners?.length ?? 0) <= 1 ? "Cannot remove the last owner" : "Remove owner"}
                 >
+                  {/* Show ellipsis while this specific owner is being removed. */}
                   {removingId === o.owner_id ? "…" : (
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -139,6 +166,7 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
               </li>
             ))}
           </ul>
+          {/* Add owner form — onSubmit calls handleAddOwner which calls e.preventDefault(). */}
           <form onSubmit={handleAddOwner} className="space-y-2">
             <input
               type="text"
@@ -172,27 +200,37 @@ function SettingsModal({ identity, onClose, onIdentityChange, sessionId, onClear
   );
 }
 
+
 export default function App() {
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [sessionId, setSessionId] = useState(null);
-  const [identity, setIdentity] = useState(null);
-  const [sessions, setSessions] = useState([]);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
+  // Top-level state — all state that needs to be shared between child components lives here.
+  const [messages,     setMessages]     = useState([]);       // All messages in the current view
+  const [loading,      setLoading]      = useState(false);    // True while awaiting a backend response
+  const [sessionId,    setSessionId]    = useState(null);     // Current session ID (null = new session)
+  const [identity,     setIdentity]     = useState(null);     // Assistant identity (name, owners, etc.)
+  const [sessions,     setSessions]     = useState([]);       // Session list shown in the sidebar
+  const [sidebarOpen,  setSidebarOpen]  = useState(false);
+  const [deletingId,   setDeletingId]   = useState(null);     // Session being deleted (for loading state)
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // useRef gives a mutable ref object whose .current property persists across renders.
+  // Used here to get a DOM reference for auto-scrolling — not tracked by React state.
   const bottomRef = useRef(null);
 
+  // useEffect with [] runs once after the first render (like componentDidMount).
+  // Loads the identity so the header can show the assistant's name immediately.
   useEffect(() => {
     getIdentity().then(setIdentity);
   }, []);
 
-  // Scroll to bottom on new messages
+  // useEffect with [messages] runs after every render where `messages` changed.
+  // Scrolls the invisible div at the bottom of the message list into view.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Load sessions when sidebar opens
+  // useCallback memoises the function — it's only re-created when its dependencies change.
+  // Without this, a new function reference would be created on every render, causing the
+  // useEffect below to fire every time App re-renders (not just when sidebarOpen changes).
   const loadSessions = useCallback(async () => {
     try {
       const data = await getSessions();
@@ -200,19 +238,21 @@ export default function App() {
     } catch {
       setSessions([]);
     }
-  }, []);
+  }, []);  // Empty deps: loadSessions never changes, safe to call from any effect
 
-  // Load sessions when sidebar opens
+  // Load sessions from the API when the sidebar is opened.
   useEffect(() => {
     if (sidebarOpen) loadSessions();
   }, [sidebarOpen, loadSessions]);
 
-  // Delete session and clear if currently loaded
   const handleDeleteSession = async (id, e) => {
+    // stopPropagation prevents the click from bubbling to the session row's onClick (which would load it).
     e.stopPropagation();
     setDeletingId(id);
     try {
       await deleteSession(id);
+      // Filter the deleted session out of local state. `prev =>` is the functional update form —
+      // safer than reading sessions directly when state updates might be batched.
       setSessions(prev => prev.filter(s => s.session_id !== id));
       if (id === sessionId) {
         setSessionId(null);
@@ -223,22 +263,23 @@ export default function App() {
     }
   };
 
-  // Send message and update conversation
   const handleSend = async (text) => {
+    // Optimistically add the user message to the UI before the response arrives.
     const userMsg = { role: "user", content: text };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => [...prev, userMsg]);   // Spread creates a new array — React requires immutability
     setLoading(true);
     try {
       const data = await sendMessage(text, sessionId);
-      setSessionId(data.session_id);
+      setSessionId(data.session_id);   // Update session ID in case this was the first message
       setMessages(prev => [...prev, {
-        role: "assistant",
-        content: data.reply,
-        emotionalState: data.emotional_state,
+        role:           "assistant",
+        content:        data.reply,
+        emotionalState: data.emotional_state,  // Passed to MessageBubble for the emotion bars
       }]);
     } catch {
+      // Show a fallback error message instead of crashing.
       setMessages(prev => [...prev, {
-        role: "assistant",
+        role:    "assistant",
         content: "Sorry, I encountered an error. Is the server running?",
       }]);
     } finally {
@@ -249,10 +290,11 @@ export default function App() {
   const handleVoice = async () => {
     setLoading(true);
     try {
+      // Ask the server to record 5 seconds of audio and return the transcription.
       const { data } = await axios.post("http://localhost:8000/api/voice/listen",
                                          null, { params: { duration: 5 } });
       if (data.transcription) {
-        await handleSend(data.transcription);
+        await handleSend(data.transcription);   // Route the transcription through the normal send flow
       }
     } finally {
       setLoading(false);
@@ -263,14 +305,16 @@ export default function App() {
     try {
       const data = await getSession(id);
       setSessionId(id);
+      // Map the turn objects from the API into the shape MessageBubble expects.
+      // `...` spread plus a conditional field: emotionalState is only added if it exists on the turn.
       setMessages(data.turns.map(t => ({
-        role: t.role,
+        role:    t.role,
         content: t.content,
         ...(t.emotional_state && { emotionalState: t.emotional_state }),
       })));
       setSidebarOpen(false);
     } catch {
-      // leave current state intact
+      // Leave current state intact if the session can't be loaded.
     }
   };
 
@@ -282,7 +326,9 @@ export default function App() {
 
   return (
     <div className="flex h-screen">
-      {/* Sidebar */}
+
+      {/* ── Sidebar ────────────────────────────────────────────── */}
+      {/* Conditional render: sidebar is mounted/unmounted based on sidebarOpen. */}
       {sidebarOpen && (
         <aside className="w-72 bg-slate-900 border-r border-slate-700 flex flex-col shrink-0">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
@@ -303,10 +349,12 @@ export default function App() {
               + New chat
             </button>
           </div>
+          {/* overflow-y-auto makes this section scrollable when sessions overflow the sidebar height. */}
           <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1">
             {sessions.length === 0 && (
               <p className="text-xs text-slate-500 px-2 mt-4">No sessions yet.</p>
             )}
+            {/* Render a clickable row for each session. Highlight the active session. */}
             {sessions.map(s => (
               <div
                 key={s.session_id}
@@ -316,12 +364,14 @@ export default function App() {
               >
                 <div className="min-w-0">
                   <p className="text-xs text-slate-300 truncate">
+                    {/* Show the LLM-generated summary if available, otherwise the timestamp. */}
                     {s.summary ?? formatTime(s.started_at)}
                   </p>
                   <p className="text-xs text-slate-500">
                     {s.turn_count} turn{s.turn_count !== 1 ? "s" : ""} · {formatTime(s.started_at)}
                   </p>
                 </div>
+                {/* Delete button: hidden by default, revealed on row hover (opacity-0 → group-hover:opacity-100). */}
                 <button
                   onClick={(e) => handleDeleteSession(s.session_id, e)}
                   disabled={deletingId === s.session_id}
@@ -346,10 +396,13 @@ export default function App() {
         </aside>
       )}
 
-      {/* Main chat area */}
+      {/* ── Main chat area ─────────────────────────────────────── */}
+      {/* max-w-3xl + mx-auto centres the chat column. flex-1 takes remaining width. */}
       <div className="flex flex-col flex-1 min-w-0 max-w-3xl mx-auto w-full">
+
         {/* Header */}
         <header className="flex items-center gap-3 px-6 py-4 border-b border-slate-700">
+          {/* Toggle sidebar — `v => !v` is a functional update that flips the boolean. */}
           <button
             onClick={() => setSidebarOpen(v => !v)}
             style={{ fontSize: "22px", color: "#cbd5e1", background: "none", border: "none", cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}
@@ -358,6 +411,7 @@ export default function App() {
           >
             ☰
           </button>
+          {/* Assistant avatar: first letter of the name, or "A" while loading. */}
           <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center
                           justify-center text-white font-bold text-lg shrink-0">
             {identity?.assistant_name?.[0] ?? "A"}
@@ -370,6 +424,7 @@ export default function App() {
               {identity?.configured ? "Online · Local AI" : "Not configured"}
             </p>
           </div>
+          {/* Settings gear icon button */}
           <button
             onClick={() => setSettingsOpen(true)}
             title="Settings"
@@ -390,17 +445,21 @@ export default function App() {
           </button>
         </header>
 
-        {/* Messages */}
+        {/* Messages list */}
         <main className="flex-1 overflow-y-auto px-4 py-6">
+          {/* Empty state: shown when there are no messages yet. */}
           {messages.length === 0 && (
             <div className="text-center text-slate-500 mt-16">
               <p className="text-4xl mb-4">🤖</p>
               <p className="text-lg">How can I help you today?</p>
             </div>
           )}
+          {/* Spread props: {...m} passes all fields of the message object as individual props to MessageBubble.
+              Equivalent to: <MessageBubble role={m.role} content={m.content} emotionalState={m.emotionalState} /> */}
           {messages.map((m, i) => (
             <MessageBubble key={i} {...m} />
           ))}
+          {/* Thinking indicator: shown while the API call is in flight. */}
           {loading && (
             <div className="flex justify-start mb-4">
               <div className="bg-slate-700 rounded-2xl px-4 py-3 text-slate-400 text-sm">
@@ -408,18 +467,19 @@ export default function App() {
               </div>
             </div>
           )}
+          {/* Invisible anchor div — scrollIntoView() targets this to keep the latest message visible. */}
           <div ref={bottomRef} />
         </main>
 
         <ChatInput voiceEnabled={true} onVoice={handleVoice} onSend={handleSend} loading={loading} />
       </div>
 
-      {/* Settings Modal */}
+      {/* ── Settings Modal ─────────────────────────────────────── */}
       {settingsOpen && (
         <SettingsModal
           identity={identity}
           onClose={() => setSettingsOpen(false)}
-          onIdentityChange={setIdentity}
+          onIdentityChange={setIdentity}   // When identity changes in the modal, update App state
           sessionId={sessionId}
           onClearChat={() => { setSessionId(null); setMessages([]); }}
         />

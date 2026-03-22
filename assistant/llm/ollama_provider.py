@@ -1,17 +1,23 @@
+# OllamaProvider implements LLMProvider for a locally running Ollama instance.
+# Ollama exposes an OpenAI-compatible /api/chat endpoint, so request/response shapes are similar.
 import httpx, json
 from typing import AsyncIterator, List
 from .base import LLMProvider, LLMMessage, LLMResponse
 from ..config.settings import settings
 
-# OllamaProvider implementation for Ollama LLM API
-class OllamaProvider(LLMProvider):
-    def __init__(self, model: str = settings.llm_model, base_url: str = settings.llm_base_url, emotion_model: str = settings.llm_model_emotion) -> None:
-        self.model = model
-        self.base_url = base_url
-        self.emotion_model = emotion_model
 
-    # Implement the emotion_analysis method to get the emotional state of the user message
+class OllamaProvider(LLMProvider):
+    def __init__(self,
+                 model:         str = settings.llm_model,
+                 base_url:      str = settings.llm_base_url,
+                 emotion_model: str = settings.llm_model_emotion) -> None:
+        self.model         = model           # Main conversational model
+        self.base_url      = base_url        # e.g. "http://localhost:11434"
+        self.emotion_model = emotion_model   # Smaller model used only for sentiment classification
+
     async def emotion_analysis(self, user_message: str) -> str:
+        """Classify the emotional tone of a message as POSITIVE, NEGATIVE, or RUDE.
+        Uses a separate (typically smaller/faster) model than the main conversation model."""
         payload = {
             "model": self.emotion_model,
             "messages": [
@@ -25,19 +31,22 @@ class OllamaProvider(LLMProvider):
                     )
                 },
                 {
-                    "role": "user",
+                    "role":    "user",
                     "content": user_message
                 }
             ],
-            "stream": False,
+            "stream":  False,
             "options": {"temperature": 0.7, "num_predict": 2048}
         }
 
+        # httpx.AsyncClient is a session that reuses the TCP connection.
+        # `async with` ensures it's closed when the block exits, even on exceptions.
+        # timeout=120.0 is generous — local LLM inference can be slow on CPU.
         async with httpx.AsyncClient(timeout=120.0) as client:
             try:
                 response = await client.post(f"{self.base_url}/api/chat", json=payload)
                 response.raise_for_status()
-                data = response.json()
+                data    = response.json()
                 message = data.get("message", {})
                 content = message.get("content", "")
                 return content.strip()
@@ -49,34 +58,35 @@ class OllamaProvider(LLMProvider):
                 print(f"DEBUG UNEXPECTED ERROR (Emotion Analysis): {type(e).__name__}: {e}")
                 raise
 
-    # Implement the complete method to get a full response from the Ollama API
-    async def complete(self, 
-                       messages: List[LLMMessage], 
+    async def complete(self,
+                       messages:    List[LLMMessage],
                        temperature: float = 0.7,
-                       max_tokens: int = 2048,
-                       tools: List[dict] = None) -> LLMResponse:
+                       max_tokens:  int   = 2048,
+                       tools:       List[dict] = None) -> LLMResponse:
+        """Send a list of messages to Ollama and return the full response.
+        If `tools` is provided, the model may return a tool_calls list instead of (or alongside) content."""
         payload = {
-            "model": self.model,
+            "model":    self.model,
+            # List comprehension converts LLMMessage dataclass objects to plain dicts for JSON serialization.
             "messages": [{"role": m.role, "content": m.content} for m in messages],
-            "stream": False,
-            "options": {"temperature": temperature, "num_predict": max_tokens}
+            "stream":   False,
+            "options":  {"temperature": temperature, "num_predict": max_tokens}
         }
 
-        # Pass tool definitions so the model knows what's available
+        # Only include tools in the payload if they were provided.
+        # Models that don't support tool calling will error if an empty list is sent.
         if tools:
             payload["tools"] = tools
 
-        # Make an asynchronous POST request to the Ollama API and parse the response
         async with httpx.AsyncClient(timeout=120.0) as client:
             try:
                 response = await client.post(f"{self.base_url}/api/chat", json=payload)
-
                 response.raise_for_status()
                 data = response.json()
 
-                message = data.get("message", {})
-                content = message.get("content", "")
-                tool_calls = message.get("tool_calls", [])
+                message    = data.get("message", {})
+                content    = message.get("content", "")
+                tool_calls = message.get("tool_calls", [])  # Empty list if model didn't call a tool
 
                 return LLMResponse(content=content, model=self.model, tool_calls=tool_calls)
             except httpx.HTTPError as e:
@@ -86,26 +96,26 @@ class OllamaProvider(LLMProvider):
                 print(f"DEBUG UNEXPECTED ERROR: {type(e).__name__}: {e}")
                 raise
 
-    # Implement the stream method to yield responses as they are generated by the Ollama API
-    async def stream(self, 
-                     messages: List[LLMMessage], 
+    async def stream(self,
+                     messages:    List[LLMMessage],
                      temperature: float = 0.7) -> AsyncIterator[str]:
+        """Stream response tokens as they are generated. Yields one string fragment at a time.
+        The caller uses `async for token in provider.stream(...)` to receive tokens."""
         payload = {
-            "model": self.model,
+            "model":    self.model,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
-            "options": {"temperature": temperature},
-            "stream": True
+            "options":  {"temperature": temperature},
+            "stream":   True   # Ollama sends back newline-delimited JSON objects as tokens arrive
         }
-        
-        # Make an asynchronous POST request to the Ollama API and yield responses as they are streamed back
+
+        # `client.stream(...)` keeps the response body open for reading line by line.
         async with httpx.AsyncClient(timeout=120.0) as client:
             async with client.stream("POST", f"{self.base_url}/api/chat", json=payload) as response:
                 response.raise_for_status()
-
-                # Iterate over the streamed lines from the response and yield the content of each message
+                # aiter_lines() yields each newline-delimited JSON string as it arrives.
                 async for line in response.aiter_lines():
                     if line:
                         data = json.loads(line)
+                        # done=True is the final sentinel message — skip it to avoid yielding empty string.
                         if not data.get("done"):
                             yield data["message"]["content"]
-    

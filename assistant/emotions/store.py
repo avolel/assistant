@@ -1,14 +1,16 @@
+# EmotionalStateStore handles reading and writing emotional state snapshots to SQLite.
+# Each assistant reply produces one row in emotional_states, linked to the session.
+# On engine startup, the most recent row for this owner is loaded to restore continuity.
 from datetime import datetime, timezone
 from typing import Optional
 from .state import EmotionalState
 from ..database.connection import get_db_connection
 
-# This store manages the persistence of emotional states for users across sessions.
+
 class EmotionalStateStore:
 
-    def save(self, owner_id: str, session_id: str,
-             state: EmotionalState) -> None:
-        """Persist the current emotional state for an owner."""
+    def save(self, owner_id: str, session_id: str, state: EmotionalState) -> None:
+        """Persist the current emotional state snapshot after each assistant turn."""
         now = datetime.now(timezone.utc).isoformat()
         with get_db_connection() as db:
             db.execute(
@@ -20,10 +22,9 @@ class EmotionalStateStore:
             )
 
     def load_latest(self, owner_id: str) -> Optional[EmotionalState]:
-        """
-        Load the most recent emotional state for an owner across all sessions.
-        Returns None if no state has ever been saved.
-        """
+        """Retrieve the most recent emotional state for an owner across ALL their sessions.
+        Joins emotional_states → sessions to filter by owner_id (emotional_states only stores session_id).
+        Returns None if the owner has no history yet."""
         with get_db_connection() as db:
             row = db.execute(
                 """SELECT e.mood, e.trust, e.stress, e.engagement
