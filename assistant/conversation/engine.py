@@ -16,6 +16,7 @@ from ..emotions.engine import EmotionEngine
 from ..time_awareness.service import TimeAwarenessService
 from ..tools.registry import ToolRegistry
 from .history import ConversationHistory
+from ..emotions.store import EmotionalStateStore
 import assistant.tools.web_search   
 import assistant.tools.notes         
 
@@ -29,12 +30,23 @@ class ConversationEngine:
         self.owner_id = owner_id
         self.session_id = str(uuid.uuid4())
         self.memory = MemoryManager(owner_id, self.session_id)
-        self.prompt_builder = PromptBuilder()
-        self.emotion_state  = EmotionalState()
+        self.prompt_builder = PromptBuilder()        
+        self.emotion_store   = EmotionalStateStore()
         self.emotion_engine = EmotionEngine()
         self.time_svc       = TimeAwarenessService(settings.owner_timezone)
         self.tools          = ToolRegistry()
         self.history = ConversationHistory(self.session_id, max_turns=20)
+
+        # On initialization, we attempt to load the most recent emotional state for the owner 
+        # across all sessions.
+        loaded = self.emotion_store.load_latest(owner_id)
+        self.emotion_state = loaded if loaded else EmotionalState()
+
+        if loaded:
+            print(f"  [emotions] Restored: mood={loaded.mood:.2f} "
+                  f"trust={loaded.trust:.2f} stress={loaded.stress:.2f} "
+                  f"engagement={loaded.engagement:.2f}")
+
         self._init_session()
 
     # Initialize a new conversation session in the databaseS
@@ -89,6 +101,10 @@ class ConversationEngine:
 
         # Update emotional state based on the conversation and response.
         self.emotion_state = self.emotion_engine.update(self.emotion_state, message_sentiment)
+
+        # Persist the updated emotional state after each interaction, 
+        # so it can be restored in future sessions.
+        self.emotion_store.save(self.owner_id, self.session_id, self.emotion_state)
 
         # Extract and store any relevant facts from the user's message for long-term memory storage.
         await self.memory.extract_and_store_facts(user_message)

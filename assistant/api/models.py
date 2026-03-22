@@ -15,10 +15,24 @@ class SetupRequest(BaseModel):
     owner_name: str
     owner_email: Optional[str] = None
     timezone: str = "UTC"
- 
+
+class UpdateNameRequest(BaseModel):
+    assistant_name: str
+
+class AddOwnerRequest(BaseModel):
+    name: str
+    email: Optional[str] = None
+    timezone: str = "UTC"
+
+class OwnerInfo(BaseModel):
+    owner_id: str
+    name: str
+    email: Optional[str] = None
+
 class IdentityResponse(BaseModel):
     assistant_name: str
     owner_name: str
+    owners: List[OwnerInfo] = []
     configured: bool
  
 class MemoryItem(BaseModel):

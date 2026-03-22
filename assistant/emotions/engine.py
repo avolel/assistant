@@ -33,3 +33,22 @@ class EmotionEngine:
         return (f"## Emotional State\nYour current state: mood={mood_lbl}, "
                 f"trust={trust_lbl}, stress={stress_lbl}. "
                 f"Let this subtly color your tone. Do not mention it directly.")
+    
+    # For saving/loading the emotional state, we can convert it to/from a dictionary.
+    def to_dict(self) -> dict:
+        return {
+            "mood":       self.mood,
+            "trust":      self.trust,
+            "stress":     self.stress,
+            "engagement": self.engagement,
+        }
+    
+    # Create an EmotionalState from a dictionary, using defaults if keys are missing.
+    @classmethod
+    def from_dict(cls, data: dict) -> "EmotionalState":
+        return cls(
+            mood=       float(data.get("mood",       0.5)),
+            trust=      float(data.get("trust",      0.5)),
+            stress=     float(data.get("stress",     0.2)),
+            engagement= float(data.get("engagement", 0.7)),
+        )

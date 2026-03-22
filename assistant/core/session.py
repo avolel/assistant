@@ -101,17 +101,39 @@ class SessionManager:
         )
 
     def get_turns(self, session_id: str) -> List[dict]:
-        """Fetch all turns for a session ordered oldest to newest."""
+        """Fetch all turns for a session ordered oldest to newest,
+        attaching the saved emotional state to each assistant turn."""
         with get_db_connection() as db:
-            rows = db.execute(
+            turn_rows = db.execute(
                 """SELECT role, content, timestamp
                    FROM conversation_turns
                    WHERE session_id = ?
                    ORDER BY timestamp ASC""",
                 (session_id,)
             ).fetchall()
-        return [{"role": r["role"], "content": r["content"],
-                 "timestamp": r["timestamp"]} for r in rows]
+            emotion_rows = db.execute(
+                """SELECT mood, trust, stress, engagement
+                   FROM emotional_states
+                   WHERE session_id = ?
+                   ORDER BY recorded_at ASC""",
+                (session_id,)
+            ).fetchall()
+
+        emotions = [
+            {"mood": r["mood"], "trust": r["trust"],
+             "stress": r["stress"], "engagement": r["engagement"]}
+            for r in emotion_rows
+        ]
+
+        result = []
+        emotion_idx = 0
+        for r in turn_rows:
+            turn = {"role": r["role"], "content": r["content"], "timestamp": r["timestamp"]}
+            if r["role"] == "assistant" and emotion_idx < len(emotions):
+                turn["emotional_state"] = emotions[emotion_idx]
+                emotion_idx += 1
+            result.append(turn)
+        return result
 
     def resume(self, session_id: str,
                owner_id: str) -> Optional[str]:
