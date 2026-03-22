@@ -127,6 +127,59 @@ class ConversationHistory:
             lines.append("")
         filepath.write_text("\n".join(lines), encoding="utf-8")
 
+    def get_content(self, fmt: str = "text") -> str:
+        """Return the export as a string without writing to disk.
+        fmt: "text" | "json" | "markdown"."""
+        turns = self.get_all_turns()
+        now   = datetime.now()
+
+        if fmt == "json":
+            return json.dumps({
+                "session_id":  self.session_id,
+                "exported_at": now.isoformat(),
+                "turn_count":  len(turns),
+                "turns":       turns,
+            }, indent=2)
+
+        if fmt == "markdown":
+            lines = [
+                "# Conversation Export",
+                "",
+                f"- **Session:** `{self.session_id}`",
+                f"- **Exported:** {now.strftime('%Y-%m-%d %H:%M:%S')}",
+                f"- **Turns:** {len(turns)}",
+                "",
+                "---",
+                "",
+            ]
+            for turn in turns:
+                timestamp = turn["timestamp"][:19].replace("T", " ")
+                lines.append(f"**You** — *{timestamp}*" if turn["role"] == "user"
+                              else f"**Assistant** — *{timestamp}*")
+                lines.append("")
+                lines.append(turn["content"])
+                lines.append("")
+                lines.append("---")
+                lines.append("")
+            return "\n".join(lines)
+
+        # Default: plain text
+        lines = [
+            "Conversation Export",
+            f"Session : {self.session_id}",
+            f"Exported: {now.strftime('%Y-%m-%d %H:%M:%S')}",
+            f"Turns   : {len(turns)}",
+            "=" * 60,
+            "",
+        ]
+        for turn in turns:
+            timestamp = turn["timestamp"][:19].replace("T", " ")
+            role      = "You" if turn["role"] == "user" else "Assistant"
+            lines.append(f"[{timestamp}] {role}:")
+            lines.append(turn["content"])
+            lines.append("")
+        return "\n".join(lines)
+
     def export(self, fmt: str = "text", filename: str = None) -> pathlib.Path:
         """Export the conversation to ~/assistant_exports/.
         fmt: "text" | "json" | "markdown". Returns the path of the exported file."""

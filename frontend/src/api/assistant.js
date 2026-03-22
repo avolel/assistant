@@ -71,3 +71,12 @@ export async function getSession(sessionId) {
   const { data } = await axios.get(`${BASE}/sessions/${sessionId}`);
   return data;   // { session_id, turns: [{role, content, timestamp, emotional_state?}], ... }
 }
+
+// GET /api/sessions/:id/export?format=... — trigger a file download for the given session.
+// Opens the URL directly so the browser handles the Content-Disposition download.
+export function exportSession(sessionId, format = "text") {
+  const url = `${BASE}/sessions/${sessionId}/export?format=${format}`;
+  const a   = document.createElement("a");
+  a.href    = url;
+  a.click();
+}

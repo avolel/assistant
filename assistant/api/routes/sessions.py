@@ -1,7 +1,10 @@
 # Sessions routes: list, retrieve, and delete conversation sessions.
+from datetime import datetime
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 from ...core.session import SessionManager
 from ...core.identity import IdentityManager
+from ...conversation.history import ConversationHistory
 
 router = APIRouter()
 
@@ -59,6 +62,31 @@ async def get_session(session_id: str):
         "summary":    session.summary,
         "turns":      turns,
     }
+
+
+@router.get("/{session_id}/export")
+async def export_session(session_id: str, format: str = "text"):
+    """Download a session as a file. format: 'text' | 'markdown' | 'json'."""
+    owner_id = _get_owner_id()
+    sm       = SessionManager()
+    session  = sm.get_session(session_id)
+    if not session or session.owner_id != owner_id:
+        raise HTTPException(404, f"Session '{session_id}' not found.")
+
+    history   = ConversationHistory(session_id)
+    content   = history.get_content(format)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    ext_map    = {"json": ("json", "application/json"),
+                  "markdown": ("md", "text/markdown")}
+    ext, mime  = ext_map.get(format, ("txt", "text/plain"))
+    filename   = f"conversation_{timestamp}.{ext}"
+
+    return Response(
+        content=content,
+        media_type=mime,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.delete("/{session_id}")

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { MessageBubble } from "./components/MessageBubble";
 import { ChatInput } from "./components/ChatInput";
 import axios from 'axios';
-import { sendMessage, getIdentity, getSessions, deleteSession, getSession, updateAssistantName, addOwner, removeOwner } from "./api/assistant";
+import { sendMessage, getIdentity, getSessions, deleteSession, getSession, updateAssistantName, addOwner, removeOwner, exportSession } from "./api/assistant";
 
 // Utility: format an ISO datetime string as a short locale string for display in the sidebar.
 function formatTime(iso) {
@@ -211,6 +211,7 @@ export default function App() {
   const [sidebarOpen,  setSidebarOpen]  = useState(false);
   const [deletingId,   setDeletingId]   = useState(null);     // Session being deleted (for loading state)
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [exportMenuId, setExportMenuId] = useState(null);     // Session with export format menu open
 
   // useRef gives a mutable ref object whose .current property persists across renders.
   // Used here to get a DOM reference for auto-scrolling — not tracked by React state.
@@ -245,6 +246,14 @@ export default function App() {
     if (sidebarOpen) loadSessions();
   }, [sidebarOpen, loadSessions]);
 
+  // Close export menu when clicking outside the sidebar.
+  useEffect(() => {
+    if (!exportMenuId) return;
+    const close = () => setExportMenuId(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [exportMenuId]);
+
   const handleDeleteSession = async (id, e) => {
     // stopPropagation prevents the click from bubbling to the session row's onClick (which would load it).
     e.stopPropagation();
@@ -276,6 +285,7 @@ export default function App() {
         content:        data.reply,
         emotionalState: data.emotional_state,  // Passed to MessageBubble for the emotion bars
       }]);
+      if (sidebarOpen) loadSessions();
     } catch {
       // Show a fallback error message instead of crashing.
       setMessages(prev => [...prev, {
@@ -371,25 +381,58 @@ export default function App() {
                     {s.turn_count} turn{s.turn_count !== 1 ? "s" : ""} · {formatTime(s.started_at)}
                   </p>
                 </div>
-                {/* Delete button: hidden by default, revealed on row hover (opacity-0 → group-hover:opacity-100). */}
-                <button
-                  onClick={(e) => handleDeleteSession(s.session_id, e)}
-                  disabled={deletingId === s.session_id}
-                  className="ml-2 shrink-0 opacity-0 group-hover:opacity-100 text-slate-400
-                             hover:text-red-400 transition-opacity disabled:opacity-50"
-                  aria-label="Delete session"
-                  title="Delete session"
-                >
-                  {deletingId === s.session_id ? "…" : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24"
-                         fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                      <path d="M10 11v6M14 11v6" />
-                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                    </svg>
-                  )}
-                </button>
+                {/* Export + Delete buttons: hidden by default, revealed on row hover. */}
+                <div className="ml-2 shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity relative">
+                  {/* Export button — toggles a small format-picker dropdown */}
+                  <div className="relative">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setExportMenuId(v => v === s.session_id ? null : s.session_id); }}
+                      className="text-slate-400 hover:text-blue-400 transition-colors"
+                      aria-label="Export session"
+                      title="Export session"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24"
+                           fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                    </button>
+                    {exportMenuId === s.session_id && (
+                      <div
+                        className="absolute right-0 top-6 z-10 bg-slate-700 border border-slate-600 rounded-lg shadow-xl py-1 w-28"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {[["text", "Plain text"], ["markdown", "Markdown"], ["json", "JSON"]].map(([fmt, label]) => (
+                          <button
+                            key={fmt}
+                            onClick={() => { exportSession(s.session_id, fmt); setExportMenuId(null); }}
+                            className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-600 hover:text-white transition-colors"
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => handleDeleteSession(s.session_id, e)}
+                    disabled={deletingId === s.session_id}
+                    className="text-slate-400 hover:text-red-400 transition-colors disabled:opacity-50"
+                    aria-label="Delete session"
+                    title="Delete session"
+                  >
+                    {deletingId === s.session_id ? "…" : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24"
+                           fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <path d="M10 11v6M14 11v6" />
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
