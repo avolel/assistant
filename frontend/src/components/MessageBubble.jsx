@@ -106,7 +106,7 @@ function EmotionBar({ state }) {
   const color_mood       = mood       > 60 ? "bg-green-500" : mood       > 35 ? "bg-yellow-500" : "bg-red-400";
   const color_trust      = trust      > 60 ? "bg-green-500" : trust      > 35 ? "bg-yellow-500" : "bg-red-400";
   const color_engagement = engagement > 60 ? "bg-green-500" : engagement > 35 ? "bg-yellow-500" : "bg-red-400";
-  const color_stress     = stress     > 60 ? "bg-green-500" : stress     > 35 ? "bg-yellow-500" : "bg-red-400";
+  const color_stress     = stress     > 60 ? "bg-red-400"   : stress     > 35 ? "bg-yellow-500" : "bg-green-500";
 
   return (
     <div className="mt-2 pt-2 border-t border-slate-600">
