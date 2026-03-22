@@ -48,10 +48,24 @@ export async function removeOwner(ownerId) {
   return data;
 }
 
-// GET /api/memory/ — fetch all long-term memories (not currently wired in the UI).
-export async function getMemories() {
-  const { data } = await axios.get(`${BASE}/memory/`);
-  return data;
+// GET /api/memory/ — list long-term memories, with optional type filter.
+export async function getMemories(limit = 100, offset = 0, memoryType = null) {
+  const params = { limit, offset };
+  if (memoryType) params.memory_type = memoryType;
+  const { data } = await axios.get(`${BASE}/memory/`, { params });
+  return data;   // { memories: [...], total: number }
+}
+
+// PATCH /api/memory/:id — update a memory's content (re-embeds it in ChromaDB).
+export async function updateMemory(memoryId, content) {
+  const { data } = await axios.patch(`${BASE}/memory/${memoryId}`, { content });
+  return data;   // { updated: true, memory_id: string }
+}
+
+// DELETE /api/memory/:id — delete a memory from ChromaDB and SQLite.
+export async function deleteMemory(memoryId) {
+  const { data } = await axios.delete(`${BASE}/memory/${memoryId}`);
+  return data;   // { deleted: true, memory_id: string }
 }
 
 // GET /api/sessions/?limit=N — fetch the most recent sessions for the sidebar.
@@ -70,6 +84,16 @@ export async function deleteSession(sessionId) {
 export async function getSession(sessionId) {
   const { data } = await axios.get(`${BASE}/sessions/${sessionId}`);
   return data;   // { session_id, turns: [{role, content, timestamp, emotional_state?}], ... }
+}
+
+// GET /api/health — check whether the backend is reachable. Returns true on success, false on failure.
+export async function checkHealth() {
+  try {
+    await axios.get(`${BASE}/health`, { timeout: 4000 });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // GET /api/sessions/:id/export?format=... — trigger a file download for the given session.

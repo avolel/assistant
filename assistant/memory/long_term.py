@@ -62,6 +62,55 @@ class LongTermMemory:
             )
         return memory_id
 
+    def list_memories(self, limit: int = 100, offset: int = 0,
+                      memory_type: Optional[str] = None) -> List[Dict]:
+        """List memories for this owner from SQLite, ordered by creation date descending."""
+        with get_db_connection() as db:
+            if memory_type:
+                rows = db.execute(
+                    "SELECT memory_id, memory_type, content, importance, created_at, last_accessed, access_count "
+                    "FROM memories WHERE owner_id=? AND memory_type=? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    (self.owner_id, memory_type, limit, offset)
+                ).fetchall()
+            else:
+                rows = db.execute(
+                    "SELECT memory_id, memory_type, content, importance, created_at, last_accessed, access_count "
+                    "FROM memories WHERE owner_id=? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    (self.owner_id, limit, offset)
+                ).fetchall()
+        return [
+            {"memory_id": r[0], "memory_type": r[1], "content": r[2],
+             "importance": r[3], "created_at": r[4], "last_accessed": r[5], "access_count": r[6]}
+            for r in rows
+        ]
+
+    def delete(self, memory_id: str) -> bool:
+        """Delete a memory from both ChromaDB and SQLite. Returns True if a row was deleted."""
+        try:
+            self.collection.delete(ids=[memory_id])
+        except Exception:
+            pass
+        with get_db_connection() as db:
+            result = db.execute(
+                "DELETE FROM memories WHERE memory_id=? AND owner_id=?",
+                (memory_id, self.owner_id)
+            )
+            return result.rowcount > 0
+
+    async def update(self, memory_id: str, content: str) -> bool:
+        """Re-embed updated content and persist it in both ChromaDB and SQLite."""
+        vector = await self.embed.embed(content)
+        try:
+            self.collection.update(ids=[memory_id], embeddings=[vector], documents=[content])
+        except Exception:
+            pass
+        with get_db_connection() as db:
+            result = db.execute(
+                "UPDATE memories SET content=? WHERE memory_id=? AND owner_id=?",
+                (content, memory_id, self.owner_id)
+            )
+            return result.rowcount > 0
+
     async def query(self, query_text: str,
                     n_results: int = settings.ltm_n_results) -> List[Dict]:
         """Embed the query and return the n most similar memories for this owner.

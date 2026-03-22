@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 import pathlib
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import chat, identity, health, voice, sessions
+from .routes import chat, identity, health, voice, sessions, memory
 
 app = FastAPI(title="Personal AI Assistant API", version="1.0.0")
 
@@ -28,9 +28,7 @@ app.include_router(identity.router,  prefix="/api/identity")
 app.include_router(chat.router,      prefix="/api/chat")
 app.include_router(voice.router,     prefix="/api/voice")
 app.include_router(sessions.router,  prefix="/api/sessions")
-# Memory router is commented out — the /api/memory endpoints exist in routes/memory.py
-# but are not currently wired in. Uncomment to re-enable:
-# app.include_router(memory.router, prefix="/api/memory")
+app.include_router(memory.router,    prefix="/api/memory")
 
 # Resolve the path to the React build output relative to this file.
 # __file__ is the absolute path of this module; .parent.parent.parent navigates up to the repo root.

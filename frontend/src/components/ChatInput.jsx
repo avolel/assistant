@@ -17,7 +17,7 @@ export function ChatInput({ onSend, onVoice, onStopVoice, loading, voiceEnabled,
   };
 
   return (
-    <div className="flex items-end gap-2 p-4 border-t border-slate-700">
+    <div className="flex items-end gap-2 px-3 py-3 sm:p-4 border-t border-slate-700">
 
       {/* While recording, replace the textarea with an animated pill + stop button. */}
       {recording ? (
@@ -35,7 +35,7 @@ export function ChatInput({ onSend, onVoice, onStopVoice, loading, voiceEnabled,
       ) : (
         <textarea
           className="flex-1 resize-none rounded-xl bg-slate-700 text-slate-100
-                     px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500
+                     px-4 py-3 text-base sm:text-sm outline-none focus:ring-2 focus:ring-blue-500
                      max-h-32"
           rows={1}
           placeholder="Message Aria…"
@@ -57,7 +57,7 @@ export function ChatInput({ onSend, onVoice, onStopVoice, loading, voiceEnabled,
         <button
           onClick={onVoice}
           disabled={loading}
-          className="p-3 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-300 transition-colors"
+          className="p-3 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-300 transition-colors touch-manipulation"
         >
           <Mic size={18} />
         </button>
@@ -69,7 +69,7 @@ export function ChatInput({ onSend, onVoice, onStopVoice, loading, voiceEnabled,
           onClick={handleSend}
           disabled={loading || !text.trim()}
           className="p-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40
-                     text-white transition-colors"
+                     text-white transition-colors touch-manipulation"
         >
           <Send size={18} />
         </button>

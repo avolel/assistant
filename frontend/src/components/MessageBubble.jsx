@@ -52,7 +52,7 @@ export function MessageBubble({ role, content, emotionalState }) {
       )}
 
       {/* Message bubble — different colours for user vs. assistant */}
-      <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed
+      <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed
         ${isUser
           ? "bg-blue-600 text-white rounded-tr-sm"       // User: blue, sharp top-right corner
           : "bg-slate-700 text-slate-100 rounded-tl-sm"  // Assistant: dark, sharp top-left corner
