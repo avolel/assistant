@@ -74,14 +74,3 @@ class MemoryManager:
     async def recall(self, query: str, n: int = 5) -> List[Dict]:
         """Semantic search: embed the query and retrieve the n most similar memories from ChromaDB."""
         return await self.ltm.query(query, n)
-
-    async def extract_and_store_facts(self, user_message: str) -> None:
-        """Heuristic fact extraction: if the user's message contains personal information keywords,
-        store the whole message as a user_fact memory. Simple but effective for first-person statements."""
-        keywords  = ["i am", "i work", "i like", "i hate", "my name",
-                     "i live", "i have", "i prefer", "i use"]
-        msg_lower = user_message.lower()
-        # any() returns True if at least one element in the iterable is truthy —
-        # equivalent to multiple `or` conditions but more concise.
-        if any(kw in msg_lower for kw in keywords):
-            await self.ltm.store(user_message, "user_fact", importance=0.7)

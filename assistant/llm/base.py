@@ -31,6 +31,12 @@ class LLMResponse:
 class LLMProvider(ABC):
 
     @abstractmethod
+    async def classify_memory(self, user_message: str) -> str:
+        """Classify whether a message is worth storing and what type it is.
+        Returns one of: user_fact | preference | event | summary | none"""
+        pass
+
+    @abstractmethod
     async def complete(self,
                        messages:    List[LLMMessage],
                        temperature: float = 0.7,

@@ -124,8 +124,11 @@ class ConversationEngine:
         self.emotion_state = self.emotion_engine.update(self.emotion_state, message_sentiment)
         self.emotion_store.save(self.owner_id, self.session_id, self.emotion_state)
 
-        # 12. Heuristic: if the message contains personal info patterns, store it in long-term memory.
-        await self.memory.extract_and_store_facts(user_message)
+        # 12. Classify the message for long-term memory and store if meaningful.
+        memory_type = await self.llm.classify_memory(user_message)
+        if memory_type != "none":
+            importance = {"user_fact": 0.8, "preference": 0.75, "event": 0.6, "summary": 0.5}.get(memory_type, 0.5)
+            await self.memory.store_memory(user_message, memory_type, importance)
 
         return response.content
 

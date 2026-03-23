@@ -58,6 +58,44 @@ class OllamaProvider(LLMProvider):
                 print(f"DEBUG UNEXPECTED ERROR (Emotion Analysis): {type(e).__name__}: {e}")
                 raise
 
+    async def classify_memory(self, user_message: str) -> str:
+        """Classify whether the message is worth storing long-term and what type it is.
+        Uses the emotion model (fast/small). Returns one of: user_fact | preference | event | summary | none"""
+        payload = {
+            "model": self.emotion_model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a memory classifier. Analyze the user's message and decide if it is a "
+                        "declarative statement that contains new information worth storing long-term. "
+                        "Questions, requests, and commands must always return 'none' — only statements qualify.\n"
+                        "Respond with exactly one word — no explanation, no punctuation:\n"
+                        "  user_fact  — a statement of personal fact (name, job, family, location, age, etc.)\n"
+                        "  preference — a statement of something the user likes, dislikes, or prefers\n"
+                        "  event      — a statement about something that happened or is planned\n"
+                        "  summary    — a statement that summarises information\n"
+                        "  none       — a question, request, command, or message with no long-term memory value"
+                    )
+                },
+                {"role": "user", "content": user_message}
+            ],
+            "stream":  False,
+            "options": {"temperature": 0.0, "num_predict": 10}
+        }
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/chat", json=payload)
+                response.raise_for_status()
+                content = response.json().get("message", {}).get("content", "none").strip().lower()
+                # Normalise — model may return "user_fact." or extra whitespace
+                for valid in ("user_fact", "preference", "event", "summary"):
+                    if valid in content:
+                        return valid
+                return "none"
+            except Exception:
+                return "none"   # Fail silently — memory classification is non-critical
+
     async def complete(self,
                        messages:    List[LLMMessage],
                        temperature: float = 0.7,

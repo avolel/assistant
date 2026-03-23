@@ -2,14 +2,13 @@ import { useState, useEffect } from "react";
 import { getMemories, updateMemory, deleteMemory } from "../api/assistant";
 
 const MEMORY_TYPE_STYLES = {
-  user_fact:    { label: "User fact",    bg: "bg-blue-900",   text: "text-blue-300"   },
-  preference:   { label: "Preference",  bg: "bg-purple-900", text: "text-purple-300" },
-  conversation: { label: "Convo",       bg: "bg-slate-700",  text: "text-slate-300"  },
-  event:        { label: "Event",       bg: "bg-amber-900",  text: "text-amber-300"  },
-  summary:      { label: "Summary",     bg: "bg-green-900",  text: "text-green-300"  },
+  user_fact:  { label: "User fact",   bg: "bg-blue-900",   text: "text-blue-300"   },
+  preference: { label: "Preference", bg: "bg-purple-900", text: "text-purple-300" },
+  event:      { label: "Event",      bg: "bg-amber-900",  text: "text-amber-300"  },
+  summary:    { label: "Summary",    bg: "bg-green-900",  text: "text-green-300"  },
 };
 
-const ALL_TYPES = ["user_fact", "preference", "event", "summary", "conversation"];
+const ALL_TYPES = ["user_fact", "preference", "event", "summary"];
 
 export function MemoryModal({ onClose }) {
   const [memories,    setMemories]    = useState([]);
