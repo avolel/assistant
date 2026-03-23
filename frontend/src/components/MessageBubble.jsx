@@ -58,8 +58,35 @@ export function MessageBubble({ role, content, emotionalState }) {
           : "bg-slate-700 text-slate-100 rounded-tl-sm"  // Assistant: dark, sharp top-left corner
         }`}
       >
-        {/* ReactMarkdown renders markdown syntax (bold, code blocks, lists) in the content string. */}
-        <ReactMarkdown>{content}</ReactMarkdown>
+        {/* ReactMarkdown renders markdown — component overrides apply Tailwind classes since
+            Tailwind's preflight resets all default browser element styles. */}
+        <ReactMarkdown
+          components={{
+            p:      ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+            ul:     ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+            ol:     ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+            li:     ({ children }) => <li className="leading-snug">{children}</li>,
+            strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+            a:      ({ href, children }) => (
+              <a href={href} target="_blank" rel="noopener noreferrer"
+                 className="text-blue-400 hover:text-blue-300 underline underline-offset-2 break-all">
+                {children}
+              </a>
+            ),
+            h1: ({ children }) => <h1 className="text-base font-bold mb-1 mt-2">{children}</h1>,
+            h2: ({ children }) => <h2 className="text-sm font-bold mb-1 mt-2">{children}</h2>,
+            h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 mt-2">{children}</h3>,
+            code: ({ inline, children }) =>
+              inline
+                ? <code className="bg-slate-800 text-blue-300 px-1 py-0.5 rounded text-xs font-mono">{children}</code>
+                : <code>{children}</code>,
+            pre: ({ children }) => (
+              <pre className="bg-slate-800 rounded-lg p-3 mb-2 overflow-x-auto text-xs font-mono text-slate-200">
+                {children}
+              </pre>
+            ),
+          }}
+        >{content}</ReactMarkdown>
 
         {/* TTS speak button — only on assistant messages, uses the browser Web Speech API. */}
         {!isUser && (

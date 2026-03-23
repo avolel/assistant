@@ -43,12 +43,18 @@ class WebSearchTool(BaseTool):
                 return ToolResult(success=False, output="",
                                   error="SearXNG returned no results for that query.")
 
-            # Format results as a bullet list. r.get('content', r.get('url', '')) falls back
-            # to URL if there's no content snippet — dict.get(key, default) avoids KeyError.
-            output = "\n".join(
-                f"- {r.get('title', 'No title')}: {r.get('content', r.get('url', ''))}"
-                for r in results[:max_results]
-            )
+            lines = []
+            for i, r in enumerate(results[:max_results], 1):
+                title   = r.get("title", "No title")
+                url     = r.get("url", "")
+                snippet = r.get("content", "").strip()
+                header  = f"**[{title}]({url})**" if url else f"**{title}**"
+                lines.append(f"{i}. {header}")
+                if snippet:
+                    lines.append(f"   {snippet}")
+                lines.append("")   # blank line between results
+
+            output = "\n".join(lines).strip()
             return ToolResult(success=True, output=output)
 
         except httpx.ConnectError:
