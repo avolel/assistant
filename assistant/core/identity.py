@@ -88,35 +88,25 @@ class IdentityManager:
             )
         return self.load()
 
-    def remove_owner(self, owner_id: str) -> AssistantIdentity:
-        """Remove an owner and cascade-delete all their sessions, turns, emotional states, and memories.
-        Raises ValueError if this would remove the last owner."""
-        with get_db_connection() as db:
-            count = db.execute("SELECT COUNT(*) FROM owners").fetchone()[0]
-            if count <= 1:
-                raise ValueError("Cannot remove the last owner")
-            # Collect all session IDs for this owner before deleting,
-            # so we can clean up child rows (turns and emotional states).
-            session_ids = [r[0] for r in db.execute(
-                "SELECT session_id FROM sessions WHERE owner_id=?", (owner_id,)
-            ).fetchall()]
-            for sid in session_ids:
-                db.execute("DELETE FROM emotional_states WHERE session_id=?", (sid,))
-                db.execute("DELETE FROM conversation_turns WHERE session_id=?", (sid,))
-            db.execute("DELETE FROM sessions WHERE owner_id=?", (owner_id,))
-            db.execute("DELETE FROM memories WHERE owner_id=?", (owner_id,))
-            db.execute("DELETE FROM owners WHERE owner_id=?", (owner_id,))
-        return self.load()
-
-    def add_owner(self, name: str, email: str = None, owner_timezone: str = "UTC") -> AssistantIdentity:
-        """Insert a new owner profile and return the updated identity."""
-        owner_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc).isoformat()
+    def update_owner(self, name: str = None, email: str = None) -> AssistantIdentity:
+        """Update the single owner's name and/or email."""
+        identity = self.load()
+        if not identity or not identity.owners:
+            raise ValueError("No owner found")
+        owner = identity.owners[0]
+        new_name  = name.strip()  if name  is not None else owner.name
+        new_email = email.strip() if email is not None else owner.email
         with get_db_connection() as db:
             db.execute(
-                "INSERT INTO owners VALUES (?,?,?,?,?,?)",
-                (owner_id, name, email, owner_timezone, "{}", now)
+                "UPDATE owners SET name=?, email=? WHERE owner_id=?",
+                (new_name, new_email, owner.owner_id)
             )
+        if new_name != owner.name:
+            persona = (f"You are {identity.name}, a personal AI assistant. "
+                       f"You are dedicated to helping {new_name} with their work and life. "
+                       f"You have a warm, professional tone and remember past conversations.")
+            with get_db_connection() as db:
+                db.execute("UPDATE assistant_identity SET persona_description=?", (persona,))
         return self.load()
 
     def is_configured(self) -> bool:

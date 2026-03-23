@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { MessageBubble } from "./components/MessageBubble";
 import { ChatInput } from "./components/ChatInput";
 import { SettingsModal } from "./components/SettingsModal";
+import { SetupModal } from "./components/SetupModal";
 import { MemoryModal } from "./components/MemoryModal";
 import { Sidebar } from "./components/Sidebar";
 import { ChatHeader } from "./components/ChatHeader";
@@ -10,32 +11,34 @@ import axios from 'axios';
 import { sendMessage, getIdentity, getSessions, deleteSession, getSession, checkHealth } from "./api/assistant";
 
 export default function App() {
-  const [messages,     setMessages]     = useState([]);
-  const [loading,      setLoading]      = useState(false);
-  const [sessionId,    setSessionId]    = useState(null);
-  const [identity,     setIdentity]     = useState(null);
-  const [sessions,     setSessions]     = useState([]);
-  const [sidebarOpen,  setSidebarOpen]  = useState(false);
-  const [deletingId,   setDeletingId]   = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [identity, setIdentity] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [memoryOpen,   setMemoryOpen]   = useState(false);
-  const [online,       setOnline]       = useState(null);   // null=checking, true=online, false=offline
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  // null=checking, true=online, false=offline
+  const [online, setOnline] = useState(null); 
 
   // Voice recording state
-  const [recording,        setRecording]        = useState(false);
+  const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const RECORDING_DURATION = 5;
+  const RECORDING_DURATION = 10;
   const mediaRecorderRef = useRef(null);
-  const chunksRef        = useRef([]);
-  const timerRef         = useRef(null);
+  const chunksRef = useRef([]);
+  const timerRef = useRef(null);
 
   const bottomRef = useRef(null);
 
+  // Fetch assistant identity on mount.
   useEffect(() => {
-    getIdentity().then(setIdentity);
+    getIdentity().then(setIdentity).catch(() => setIdentity({ configured: false }));
   }, []);
 
-  // Poll the health endpoint every 15 s.
+  // Poll the health endpoint every 15 s on mount.
   useEffect(() => {
     let cancelled = false;
     const poll = async () => {
@@ -44,9 +47,11 @@ export default function App() {
     };
     poll();
     const id = setInterval(poll, 15_000);
+    // Cleanup on unmount.
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
+  // Scroll to bottom whenever messages change on mount.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -216,7 +221,7 @@ export default function App() {
           {messages.length === 0 && (
             <div className="text-center text-slate-500 mt-16">
               <p className="text-4xl mb-4">🤖</p>
-              <p className="text-lg">How can I help you today?</p>
+              <p className="text-lg">How can I help you{identity?.owner_name ? `, ${identity.owner_name}` : ""}?</p>
             </div>
           )}
           {messages.map((m, i) => (
@@ -250,9 +255,12 @@ export default function App() {
           identity={identity}
           onClose={() => setSettingsOpen(false)}
           onIdentityChange={setIdentity}
-          sessionId={sessionId}
-          onClearChat={() => { setSessionId(null); setMessages([]); }}
         />
+      )}
+
+      {/* Non-dismissible setup modal — shown until both assistant and owner are configured */}
+      {identity !== null && !identity.configured && (
+        <SetupModal onSetupComplete={setIdentity} />
       )}
     </div>
   );

@@ -1,6 +1,6 @@
-# Identity routes: CRUD for the assistant's name and owner profiles.
+# Identity routes: CRUD for the assistant's name and the single owner profile.
 from fastapi import APIRouter, HTTPException
-from ..models import SetupRequest, IdentityResponse, UpdateNameRequest, AddOwnerRequest, OwnerInfo
+from ..models import SetupRequest, IdentityResponse, UpdateNameRequest, UpdateOwnerRequest, OwnerInfo
 from ...core.identity import IdentityManager
 
 router          = APIRouter()
@@ -8,8 +8,7 @@ identity_manager = IdentityManager()
 
 
 def _to_response(identity) -> IdentityResponse:
-    """Convert an AssistantIdentity domain object to the API response model.
-    Private helper (underscore prefix = internal convention, not enforced by Python)."""
+    """Convert an AssistantIdentity domain object to the API response model."""
     owners = [OwnerInfo(owner_id=o.owner_id, name=o.name, email=o.email) for o in identity.owners]
     return IdentityResponse(
         assistant_name = identity.name,
@@ -47,25 +46,12 @@ async def update_name(req: UpdateNameRequest):
     return _to_response(identity)
 
 
-@router.post("/owners", response_model=IdentityResponse)
-async def add_owner(req: AddOwnerRequest):
-    """Add a new owner profile. The assistant retains its identity; each owner gets their own sessions."""
+@router.patch("/owner", response_model=IdentityResponse)
+async def update_owner(req: UpdateOwnerRequest):
+    """Update the owner's name and/or email."""
     if not identity_manager.is_configured():
         raise HTTPException(400, "Not configured")
-    if not req.name.strip():
+    if req.name is not None and not req.name.strip():
         raise HTTPException(422, "Owner name cannot be empty")
-    identity = identity_manager.add_owner(req.name.strip(), req.email, req.timezone)
-    return _to_response(identity)
-
-
-@router.delete("/owners/{owner_id}", response_model=IdentityResponse)
-async def remove_owner(owner_id: str):
-    """Remove an owner and cascade-delete all their sessions and memories.
-    Returns 400 if this would remove the last owner."""
-    if not identity_manager.is_configured():
-        raise HTTPException(400, "Not configured")
-    try:
-        identity = identity_manager.remove_owner(owner_id)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    identity = identity_manager.update_owner(req.name, req.email)
     return _to_response(identity)

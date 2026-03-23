@@ -27,10 +27,9 @@ class UpdateNameRequest(BaseModel):
     assistant_name: str
 
 
-class AddOwnerRequest(BaseModel):
-    name:     str
-    email:    Optional[str] = None
-    timezone: str = "UTC"
+class UpdateOwnerRequest(BaseModel):
+    name:  Optional[str] = None
+    email: Optional[str] = None
 
 
 class OwnerInfo(BaseModel):

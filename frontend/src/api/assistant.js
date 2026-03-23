@@ -36,15 +36,9 @@ export async function updateAssistantName(assistantName) {
   return data;
 }
 
-// POST /api/identity/owners — add a new owner profile. Returns the full IdentityResponse.
-export async function addOwner(payload) {
-  const { data } = await axios.post(`${BASE}/identity/owners`, payload);
-  return data;
-}
-
-// DELETE /api/identity/owners/:id — remove an owner. Returns the full IdentityResponse.
-export async function removeOwner(ownerId) {
-  const { data } = await axios.delete(`${BASE}/identity/owners/${ownerId}`);
+// PATCH /api/identity/owner — update the owner's name and/or email.
+export async function updateOwner(payload) {
+  const { data } = await axios.patch(`${BASE}/identity/owner`, payload);
   return data;
 }
 
