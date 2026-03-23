@@ -10,7 +10,7 @@ A fully local, always-on AI assistant that runs entirely on your machine. Built 
 
 - **Persistent Identity** — Name and personality that survive restarts
 - **Hybrid Memory** — Short-term session memory (SQLite) + long-term semantic recall (ChromaDB)
-- **Session Management** — List, resume, and delete past conversation sessions
+- **Session Management** — List, resume, delete, and export past conversation sessions
 - **Conversation Export** — Export sessions to plain text, markdown, or JSON
 - **Emotional Simulation** — LLM-powered sentiment analysis drives internal mood, trust, stress, and engagement that subtly influence every response
 - **Time Awareness** — Knows the date, time, day of week, and simulates work-hour availability
@@ -20,7 +20,7 @@ A fully local, always-on AI assistant that runs entirely on your machine. Built 
 - **Voice Interface** — Local STT via faster-whisper + TTS via pyttsx3 or Coqui
 - **REST API** — FastAPI backend with Swagger docs at `/docs`
 - **React Frontend** — Chat UI with markdown rendering and live mood indicator
-- **Multi-Owner Support** — Single assistant identity, multiple owner profiles each with their own sessions and memories
+- **Single Owner** — One assistant identity dedicated to one owner, with persistent profile, sessions, and memories
 
 ---
 
@@ -152,7 +152,7 @@ Every user message is classified as `POSITIVE`, `NEGATIVE`, or `RUDE` by a small
 | `stress` | 0.0–1.0 | 0.2 |
 | `engagement` | 0.0–1.0 | 0.7 |
 
-Positive interactions raise mood and trust. Negative interactions increase stress. Rude interactions significantly reduce trust and engagement. All values drift back toward their baseline over time. The emotional state is injected into the system prompt on every turn.
+Positive interactions raise mood and trust. Negative interactions increase stress. Rude interactions significantly reduce trust and engagement. All values drift back toward their baseline over time. The emotional state is injected into the system prompt on every turn and persists across restarts.
 
 ---
 
@@ -198,15 +198,20 @@ Parameters marked `optional: True` are excluded from the `required` field sent t
 | `GET` | `/api/health` | Health check |
 | `GET` | `/api/identity/` | Get assistant identity |
 | `POST` | `/api/identity/setup` | First-time setup |
+| `PATCH` | `/api/identity/` | Rename assistant |
+| `PATCH` | `/api/identity/owner` | Update owner info |
 | `POST` | `/api/chat/` | Send a message |
 | `GET` | `/api/memory/` | List all memories |
 | `POST` | `/api/memory/search` | Semantic memory search |
 | `POST` | `/api/memory/` | Store a memory manually |
+| `PATCH` | `/api/memory/{id}` | Update a memory |
 | `DELETE` | `/api/memory/{id}` | Delete a memory |
 | `GET` | `/api/sessions/` | List all sessions |
 | `GET` | `/api/sessions/{id}` | Get session + turn history |
+| `GET` | `/api/sessions/{id}/export` | Export session (`?format=json\|markdown\|text`) |
 | `DELETE` | `/api/sessions/{id}` | Delete a session |
 | `POST` | `/api/voice/listen` | Record audio and transcribe |
+| `POST` | `/api/voice/transcribe` | Upload audio file for transcription |
 | `POST` | `/api/voice/speak` | Synthesize speech from text |
 
 ---
@@ -231,7 +236,7 @@ sudo apt install -y portaudio19-dev
 
 ```env
 ASSISTANT_LLM_PROVIDER=ollama
-ASSISTANT_LLM_MODEL=gpt-oss:20b
+ASSISTANT_LLM_MODEL=llama3
 ASSISTANT_LLM_MODEL_EMOTION=llama3.1:8b
 ASSISTANT_LLM_BASE_URL=http://localhost:11434
 ASSISTANT_LLM_TEMPERATURE=0.7
@@ -246,7 +251,7 @@ Any Ollama model works. Native tool-calling models (that return structured `tool
 ```env
 # LLM
 ASSISTANT_LLM_PROVIDER=ollama
-ASSISTANT_LLM_MODEL=gpt-oss:20b
+ASSISTANT_LLM_MODEL=llama3
 ASSISTANT_LLM_MODEL_EMOTION=llama3.1:8b
 ASSISTANT_LLM_BASE_URL=http://localhost:11434
 ASSISTANT_LLM_TEMPERATURE=0.7
@@ -331,12 +336,13 @@ assistant/
 │   │
 │   ├── database/
 │   │   ├── connection.py          # SQLite context manager (WAL mode)
-│   │   └── migrations.py          # Schema initialization
+│   │   ├── migrations.py          # Schema initialization
+│   │   └── schema.sql             # Database schema
 │   │
 │   └── config/
 │       └── settings.py            # Pydantic settings
 │
-├── frontend/                      # React + Tailwind chat UI
+├── frontend/                      # React + Vite + Tailwind chat UI
 │
 └── tests/
     ├── unit/
