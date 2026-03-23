@@ -48,7 +48,8 @@ CREATE TABLE IF NOT EXISTS memories (
 
 CREATE TABLE IF NOT EXISTS emotional_states (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id  TEXT NOT NULL REFERENCES sessions(session_id),
+    owner_id    TEXT NOT NULL REFERENCES owners(owner_id),
+    session_id  TEXT,   -- nullable: retained even after session deletion
     mood        REAL NOT NULL,
     trust       REAL NOT NULL,
     stress      REAL NOT NULL,

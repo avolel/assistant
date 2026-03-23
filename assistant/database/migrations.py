@@ -20,4 +20,22 @@ def run_migrations() -> None:
     executescript() runs multiple SQL statements separated by semicolons in one call."""
     with get_db_connection() as conn:
         conn.executescript(SCHEMA)
+        _add_owner_id_to_emotional_states(conn)
     print("✓ Database schema ready.")
+
+
+def _add_owner_id_to_emotional_states(conn) -> None:
+    """One-time migration: add owner_id column to emotional_states and backfill from sessions.
+    Safe to run multiple times — the ALTER TABLE is skipped if the column already exists."""
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(emotional_states)").fetchall()]
+    if "owner_id" in cols:
+        return
+    conn.execute("ALTER TABLE emotional_states ADD COLUMN owner_id TEXT")
+    conn.execute(
+        """UPDATE emotional_states
+           SET owner_id = (
+               SELECT owner_id FROM sessions WHERE sessions.session_id = emotional_states.session_id
+           )
+           WHERE owner_id IS NULL"""
+    )
+    conn.commit()

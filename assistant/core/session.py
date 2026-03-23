@@ -174,7 +174,6 @@ class SessionManager:
 
         with get_db_connection() as db:
             db.execute("DELETE FROM conversation_turns WHERE session_id = ?", (session_id,))
-            db.execute("DELETE FROM emotional_states WHERE session_id = ?", (session_id,))
             db.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
 
         return True

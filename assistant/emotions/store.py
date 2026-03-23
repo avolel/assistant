@@ -15,23 +15,20 @@ class EmotionalStateStore:
         with get_db_connection() as db:
             db.execute(
                 """INSERT INTO emotional_states
-                       (session_id, mood, trust, stress, engagement, recorded_at)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (session_id, state.mood, state.trust,
+                       (owner_id, session_id, mood, trust, stress, engagement, recorded_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (owner_id, session_id, state.mood, state.trust,
                  state.stress, state.engagement, now)
             )
 
     def load_latest(self, owner_id: str) -> Optional[EmotionalState]:
-        """Retrieve the most recent emotional state for an owner across ALL their sessions.
-        Joins emotional_states → sessions to filter by owner_id (emotional_states only stores session_id).
-        Returns None if the owner has no history yet."""
+        """Retrieve the most recent emotional state for an owner, surviving session deletion."""
         with get_db_connection() as db:
             row = db.execute(
-                """SELECT e.mood, e.trust, e.stress, e.engagement
-                   FROM emotional_states e
-                   JOIN sessions s ON s.session_id = e.session_id
-                   WHERE s.owner_id = ?
-                   ORDER BY e.recorded_at DESC
+                """SELECT mood, trust, stress, engagement
+                   FROM emotional_states
+                   WHERE owner_id = ?
+                   ORDER BY recorded_at DESC
                    LIMIT 1""",
                 (owner_id,)
             ).fetchone()
