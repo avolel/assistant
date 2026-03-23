@@ -6,7 +6,7 @@ import zoneinfo   # Python 3.9+ stdlib; handles IANA timezone names like "Americ
 
 class TimeAwarenessService:
     WORK_START = time(8,  0)   # 08:00 AM — start of the simulated work day
-    WORK_END   = time(18, 0)   # 06:00 PM — end of the simulated work day
+    WORK_END   = time(23, 59)  # 11:59 PM — end of the simulated work day
 
     def __init__(self, timezone: str = "UTC") -> None:
         # ZoneInfo("America/New_York") creates a timezone-aware object from an IANA name.
@@ -35,13 +35,13 @@ class TimeAwarenessService:
             f"Current time: {n.strftime('%A, %B %d, %Y at %I:%M %p %Z')}. "
             f"You are currently {avail}. "
             f"You work from {self.WORK_START.strftime('%I:%M %p')} to "
-            f"{self.WORK_END.strftime('%I:%M %p')} on weekdays. "
+            f"{self.WORK_END.strftime('%I:%M %p')}. "
             f"Do not answer user questions at this time, but instead respond with a message "
             f"indicating that you are currently not available and will respond during your working hours."
         )
 
     def is_available(self) -> bool:
-        """Return True if the current time is within work hours on a weekday.
-        weekday() returns 0 (Monday) through 6 (Sunday); < 5 means Mon–Fri."""
+        """Return True if the current time is within work hours.
+        weekday() returns 0 (Monday) through 6 (Sunday); <= 6 means Mon–Sun."""
         n = self.now()
-        return n.weekday() < 5 and self.WORK_START <= n.time() <= self.WORK_END
+        return n.weekday() <= 6 and self.WORK_START <= n.time() <= self.WORK_END
