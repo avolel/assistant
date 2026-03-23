@@ -5,11 +5,20 @@
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import pathlib
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import chat, identity, health, voice, sessions, memory
+from ..database.migrations import run_migrations
 
-app = FastAPI(title="Personal AI Assistant API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    run_migrations()
+    yield
+
+
+app = FastAPI(title="Personal AI Assistant API", version="1.0.0", lifespan=lifespan)
 
 # CORS middleware allows the React dev server (localhost:5173) to call this API.
 # In production the frontend is served from this same origin, so CORS is only needed for local dev.

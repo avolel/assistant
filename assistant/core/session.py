@@ -174,6 +174,9 @@ class SessionManager:
 
         with get_db_connection() as db:
             db.execute("DELETE FROM conversation_turns WHERE session_id = ?", (session_id,))
+            # Detach emotional states from the session before deleting it — they are kept
+            # intentionally (owner's emotional continuity survives session deletion).
+            db.execute("UPDATE emotional_states SET session_id = NULL WHERE session_id = ?", (session_id,))
             db.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
 
         return True

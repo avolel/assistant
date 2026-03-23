@@ -21,6 +21,7 @@ def run_migrations() -> None:
     with get_db_connection() as conn:
         conn.executescript(SCHEMA)
         _add_owner_id_to_emotional_states(conn)
+        _make_emotional_states_session_id_nullable(conn)
     print("✓ Database schema ready.")
 
 
@@ -39,3 +40,38 @@ def _add_owner_id_to_emotional_states(conn) -> None:
            WHERE owner_id IS NULL"""
     )
     conn.commit()
+
+
+def _make_emotional_states_session_id_nullable(conn) -> None:
+    """One-time migration: recreate emotional_states with session_id nullable.
+    SQLite cannot ALTER COLUMN, so we rename → recreate → copy → drop.
+    Safe to run multiple times — skipped if session_id is already nullable."""
+    # notnull=1 means the column has a NOT NULL constraint.
+    cols = {row[1]: row[3] for row in conn.execute("PRAGMA table_info(emotional_states)").fetchall()}
+    if cols.get("session_id", 1) == 0:
+        return  # already nullable, nothing to do
+
+    conn.executescript("""
+        PRAGMA foreign_keys = OFF;
+
+        ALTER TABLE emotional_states RENAME TO emotional_states_old;
+
+        CREATE TABLE emotional_states (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_id    TEXT REFERENCES owners(owner_id),
+            session_id  TEXT,
+            mood        REAL NOT NULL,
+            trust       REAL NOT NULL,
+            stress      REAL NOT NULL,
+            engagement  REAL NOT NULL,
+            recorded_at TEXT NOT NULL
+        );
+
+        INSERT INTO emotional_states (id, owner_id, session_id, mood, trust, stress, engagement, recorded_at)
+        SELECT id, owner_id, session_id, mood, trust, stress, engagement, recorded_at
+        FROM emotional_states_old;
+
+        DROP TABLE emotional_states_old;
+
+        PRAGMA foreign_keys = ON;
+    """)
