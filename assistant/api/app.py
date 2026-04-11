@@ -14,9 +14,18 @@ from ..database.migrations import run_migrations
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
     run_migrations()
+    # Start the deferred-task background scheduler on server startup.
+    from ..core.identity import IdentityManager
+    from ..tasks.scheduler import run_deferred_scheduler
+    from .session_store import get_or_create_engine
+    mgr = IdentityManager()
+    identity = mgr.load()
+    if identity:
+        owner_id = identity.owners[0].owner_id
+        asyncio.create_task(run_deferred_scheduler(get_or_create_engine, owner_id))
     yield
-
 
 app = FastAPI(title="Personal AI Assistant API", version="1.0.0", lifespan=lifespan)
 

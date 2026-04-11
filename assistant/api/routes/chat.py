@@ -20,7 +20,8 @@ async def send_message(req: ChatRequest):
         return ChatResponse(
             reply           = reply,
             session_id      = engine.session_id,
-            emotional_state = engine.emotion_state.to_dict()
+            emotional_state = engine.emotion_state.to_dict(),
+            deferred        = engine.time_svc.should_defer()
         )
     except Exception as e:
         print(f"Error in chat endpoint: {e}")

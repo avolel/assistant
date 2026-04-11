@@ -4,14 +4,14 @@
 import { useState } from "react";
 import { Send, Mic, Square } from "lucide-react";
 
-export function ChatInput({ onSend, onVoice, onStopVoice, loading, voiceEnabled, recording, recordingSeconds, recordingDuration = 10 }) {
+export function ChatInput({ onSend, onVoice, onStopVoice, loading, voiceEnabled, recording, recordingSeconds, recordingDuration = 10, disabled = false }) {
   // useState returns [currentValue, setterFunction].
   // setText("...") triggers a re-render with the new value.
   const [text, setText] = useState("");
 
   const handleSend = () => {
-    // Guard: don't send if the trimmed text is empty, or if a request is already in flight.
-    if (!text.trim() || loading) return;
+    // Guard: don't send if the trimmed text is empty, offline, or a request is already in flight.
+    if (!text.trim() || loading || disabled) return;
     onSend(text.trim());   // Call the parent's handler (defined in App.jsx)
     setText("");           // Clear the input after sending
   };
@@ -36,10 +36,11 @@ export function ChatInput({ onSend, onVoice, onStopVoice, loading, voiceEnabled,
         <textarea
           className="flex-1 resize-none rounded-xl bg-slate-700 text-slate-100
                      px-4 py-3 text-base sm:text-sm outline-none focus:ring-2 focus:ring-blue-500
-                     max-h-32"
+                     max-h-32 disabled:opacity-40 disabled:cursor-not-allowed"
           rows={1}
-          placeholder="Message Aria…"
+          placeholder={disabled ? "Ollama is offline…" : "Message Aria…"}
           value={text}
+          disabled={disabled}
           // onChange fires on every keystroke. e.target.value is the current textarea content.
           onChange={e => setText(e.target.value)}
           onKeyDown={e => {
@@ -56,7 +57,7 @@ export function ChatInput({ onSend, onVoice, onStopVoice, loading, voiceEnabled,
       {voiceEnabled && !recording && (
         <button
           onClick={onVoice}
-          disabled={loading}
+          disabled={loading || disabled}
           className="p-3 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-300 transition-colors touch-manipulation"
         >
           <Mic size={18} />
@@ -67,7 +68,7 @@ export function ChatInput({ onSend, onVoice, onStopVoice, loading, voiceEnabled,
       {!recording && (
         <button
           onClick={handleSend}
-          disabled={loading || !text.trim()}
+          disabled={loading || disabled || !text.trim()}
           className="p-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40
                      text-white transition-colors touch-manipulation"
         >

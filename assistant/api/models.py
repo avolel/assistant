@@ -14,6 +14,7 @@ class ChatResponse(BaseModel):
     reply:          str
     session_id:     str            # Always returned so the frontend can resume the same session
     emotional_state: dict          # { mood, trust, stress, engagement } floats
+    deferred:        bool = False   # True when this reply is an off-clock queue confirmation
 
 
 class SetupRequest(BaseModel):

@@ -36,8 +36,9 @@ class TimeAwarenessService:
             f"You are currently {avail}. "
             f"You work from {self.WORK_START.strftime('%I:%M %p')} to "
             f"{self.WORK_END.strftime('%I:%M %p')}. "
-            f"Do not answer user questions at this time, but instead respond with a message "
-            f"indicating that you are currently not available and will respond during your working hours."
+            f"You are off the clock. Any tasks sent by the user have been queued and will be "
+            f"executed automatically when your working hours begin. Tell the user their request "
+            f"has been saved and will be handled when you are back on the clock."
         )
 
     def is_available(self) -> bool:
@@ -45,3 +46,7 @@ class TimeAwarenessService:
         weekday() returns 0 (Monday) through 6 (Sunday); <= 6 means Mon–Sun."""
         n = self.now()
         return n.weekday() <= 6 and self.WORK_START <= n.time() <= self.WORK_END
+    
+    def should_defer(self) -> bool:
+        """Return True when the assistant is off-clock and incoming tasks should be queued."""
+        return not self.is_available()

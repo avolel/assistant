@@ -2,6 +2,7 @@
 // or an assistant message (left-aligned, dark) with optional emotional state bars.
 import { useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
+import rehypeRaw from "rehype-raw";
 import { Volume2, VolumeX } from "lucide-react";
 
 // Strip markdown syntax so the speech synthesiser reads clean prose, not "asterisk asterisk bold".
@@ -20,7 +21,7 @@ function stripMarkdown(text) {
 
 // Props are destructured directly in the function signature — equivalent to:
 // function MessageBubble(props) { const { role, content, emotionalState } = props; ... }
-export function MessageBubble({ role, content, emotionalState }) {
+export function MessageBubble({ role, content, emotionalState, deferred }) {
   const isUser = role === "user";
   const [speaking, setSpeaking] = useState(false);
 
@@ -58,9 +59,18 @@ export function MessageBubble({ role, content, emotionalState }) {
           : "bg-slate-700 text-slate-100 rounded-tl-sm"  // Assistant: dark, sharp top-left corner
         }`}
       >
+        {/* Off-clock queue badge */}
+        {deferred && !isUser && (
+          <div className="flex items-center gap-1 text-xs text-amber-400 mb-2">
+            <span>⏰</span>
+            <span>Queued — will run when back on the clock</span>
+          </div>
+        )}
+
         {/* ReactMarkdown renders markdown — component overrides apply Tailwind classes since
             Tailwind's preflight resets all default browser element styles. */}
         <ReactMarkdown
+          rehypePlugins={[rehypeRaw]}
           components={{
             p:      ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
             ul:     ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
@@ -84,6 +94,26 @@ export function MessageBubble({ role, content, emotionalState }) {
               <pre className="bg-slate-800 rounded-lg p-3 mb-2 overflow-x-auto text-xs font-mono text-slate-200">
                 {children}
               </pre>
+            ),
+            table: ({ children }) => (
+              <div className="overflow-x-auto my-3 rounded-lg border border-slate-600">
+                <table className="w-full text-xs border-collapse">{children}</table>
+              </div>
+            ),
+            thead: ({ children }) => (
+              <thead className="bg-slate-800/80 text-slate-300">{children}</thead>
+            ),
+            tbody: ({ children }) => (
+              <tbody className="divide-y divide-slate-600/50">{children}</tbody>
+            ),
+            tr: ({ children }) => (
+              <tr className="hover:bg-slate-600/20 transition-colors">{children}</tr>
+            ),
+            th: ({ children }) => (
+              <th className="px-3 py-2 text-left font-semibold text-slate-300 whitespace-nowrap border-b border-slate-600">{children}</th>
+            ),
+            td: ({ children }) => (
+              <td className="px-3 py-2 text-slate-200 align-top leading-relaxed">{children}</td>
             ),
           }}
         >{content}</ReactMarkdown>

@@ -1,6 +1,7 @@
 # ConversationEngine is the heart of the system.
 # It orchestrates a single chat turn: memory recall → emotion analysis → prompt building
 # → LLM call → optional tool execution → memory storage → emotion persistence.
+from ..tasks.deferred import DeferredTaskManager
 from datetime import datetime, timezone
 from typing import List, Optional
 from unittest import result
@@ -32,7 +33,7 @@ class ConversationEngine:
                  llm: LLMProvider,
                  identity: AssistantIdentity,
                  owner_id: str) -> None:
-        self.llm = llm
+        self.llm = llm        
         self.identity = identity
         self.owner_id = owner_id
         self.session_id = str(uuid.uuid4())   # New UUID per engine instance = new session per user/tab
@@ -42,6 +43,7 @@ class ConversationEngine:
         self.emotion_engine = EmotionEngine()
         self.time_svc       = TimeAwarenessService(settings.owner_timezone)
         self.tools          = ToolRegistry()
+        self.deferred = DeferredTaskManager()
         self.history        = ConversationHistory(self.session_id, max_turns=20)
 
         # Restore the owner's emotional state from their most recent previous session.
@@ -67,6 +69,19 @@ class ConversationEngine:
     # FastAPI and Python's asyncio event loop handle scheduling without blocking the server.
     async def chat(self, user_message: str, extra_context: str = "") -> str:
         """Process one user message end-to-end and return the assistant's reply string."""
+
+        # Off-clock: queue the request and return early with a confirmation.
+        if self.time_svc.should_defer():
+            self.deferred.enqueue(self.owner_id, self.session_id, user_message)
+            self.memory.add_turn("user", user_message)
+            n = self.time_svc.now()
+            reply = (
+                f"I'm currently off the clock (it's {n.strftime('%I:%M %p %Z')}). "
+                f"I've saved your request and will take care of it when I'm back on the clock "
+                f"at {self.time_svc.WORK_START.strftime('%I:%M %p')}."
+            )
+            self.memory.add_turn("assistant", reply)
+            return reply
 
         # 1. Save the user turn immediately so it's in memory for context building.
         self.memory.add_turn("user", user_message)

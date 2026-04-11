@@ -94,6 +94,7 @@ export default function App() {
         role:           "assistant",
         content:        data.reply,
         emotionalState: data.emotional_state,
+        deferred:       data.deferred ?? false, 
       }]);
       if (sidebarOpen) loadSessions();
     } catch {
@@ -246,6 +247,7 @@ export default function App() {
           recording={recording}
           recordingSeconds={recordingSeconds}
           recordingDuration={RECORDING_DURATION}
+          disabled={online !== true}
         />
       </div>
 

@@ -57,6 +57,17 @@ CREATE TABLE IF NOT EXISTS emotional_states (
     recorded_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS deferred_tasks (
+    task_id     TEXT PRIMARY KEY,
+    owner_id    TEXT NOT NULL REFERENCES owners(owner_id),
+    session_id  TEXT NOT NULL,
+    message     TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'pending',  -- 'pending' | 'done' | 'failed'
+    created_at  TEXT NOT NULL,
+    executed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_deferred_owner_status ON deferred_tasks(owner_id, status);
 CREATE INDEX IF NOT EXISTS idx_turns_session   ON conversation_turns(session_id);
 CREATE INDEX IF NOT EXISTS idx_memories_owner  ON memories(owner_id);
 CREATE INDEX IF NOT EXISTS idx_memories_type   ON memories(memory_type);
